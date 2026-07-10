@@ -1,0 +1,1460 @@
+     1→"use client";
+     2→
+     3→import React, { useState, useEffect, useCallback } from "react";
+     4→import {
+     5→  PieChart,
+     6→  Pie,
+     7→  Cell,
+     8→  BarChart,
+     9→  Bar,
+    10→  XAxis,
+    11→  YAxis,
+    12→  CartesianGrid,
+    13→  Tooltip,
+    14→  ResponsiveContainer,
+    15→  Legend,
+    16→} from "recharts";
+    17→import { motion, AnimatePresence } from "framer-motion";
+    18→import {
+    19→  Wallet,
+    20→  TrendingUp,
+    21→  PiggyBank,
+    22→  ShoppingCart,
+    23→  Send,
+    24→  Trash2,
+    25→  CheckCircle2,
+    26→  XCircle,
+    27→  Settings2,
+    28→  BarChart3,
+    29→  MessageSquare,
+    30→  RefreshCw,
+    31→  Plus,
+    32→  ExternalLink,
+    33→  Clock,
+    34→  Building2,
+    35→  Bot,
+    36→  ChevronDown,
+    37→  Copy,
+    38→  Zap,
+    39→  ShieldCheck,
+    40→  ArrowRight,
+    41→} from "lucide-react";
+    42→import { Button } from "@/components/ui/button";
+    43→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+    44→import { Input } from "@/components/ui/input";
+    45→import { Label } from "@/components/ui/label";
+    46→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    47→import { Badge } from "@/components/ui/badge";
+    48→import { Separator } from "@/components/ui/separator";
+    49→import { Slider } from "@/components/ui/slider";
+    50→import {
+    51→  Select,
+    52→  SelectContent,
+    53→  SelectItem,
+    54→  SelectTrigger,
+    55→  SelectValue,
+    56→} from "@/components/ui/select";
+    57→import { Textarea } from "@/components/ui/textarea";
+    58→import { Switch } from "@/components/ui/switch";
+    59→import { Skeleton } from "@/components/ui/skeleton";
+    60→import { ScrollArea } from "@/components/ui/scroll-area";
+    61→import {
+    62→  Dialog,
+    63→  DialogContent,
+    64→  DialogDescription,
+    65→  DialogFooter,
+    66→  DialogHeader,
+    67→  DialogTitle,
+    68→} from "@/components/ui/dialog";
+    69→import { Toaster, toast } from "sonner";
+    70→
+    71→// Types
+    72→interface Transaction {
+    73→  id: string;
+    74→  amount: number;
+    75→  needsAmount: number;
+    76→  wantsAmount: number;
+    77→  savingsAmount: number;
+    78→  savingsTransferred: boolean;
+    79→  smsText: string;
+    80→  bankName: string;
+    81→  cardLast4: string;
+    82→  paymentLink: string;
+    83→  confirmedAt: string | null;
+    84→  createdAt: string;
+    85→  updatedAt: string;
+    86→}
+    87→
+    88→interface Settings {
+    89→  id: string;
+    90→  needsPercent: number;
+    91→  wantsPercent: number;
+    92→  savingsPercent: number;
+    93→  savingsCardNumber: string;
+    94→  savingsCardBank: string;
+    95→  paymentService: string;
+    96→  telegramBotToken: string;
+    97→  telegramChatId: string;
+    98→  reportDayOfWeek: number;
+    99→  reportHour: number;
+   100→}
+   101→
+   102→interface ReportData {
+   103→  month: {
+   104→    totalIncome: number;
+   105→    totalNeeds: number;
+   106→    totalWants: number;
+   107→    totalSavings: number;
+   108→    transferredSavings: number;
+   109→    pendingSavings: number;
+   110→    transactionCount: number;
+   111→  };
+   112→  week: {
+   113→    totalIncome: number;
+   114→    totalNeeds: number;
+   115→    totalWants: number;
+   116→    totalSavings: number;
+   117→    transactionCount: number;
+   118→  };
+   119→  dailyStats: { date: string; income: number; savings: number }[];
+   120→  bankStats: Record<string, { count: number; total: number }>;
+   121→}
+   122→
+   123→// Helpers
+   124→function formatMoney(n: number): string {
+   125→  return n.toLocaleString("uz-UZ") + " so'm";
+   126→}
+   127→
+   128→const NEEDS_COLOR = "#f59e0b";
+   129→const WANTS_COLOR = "#8b5cf6";
+   130→const SAVINGS_COLOR = "#10b981";
+   131→
+   132→// ============================================================
+   133→// Main Page
+   134→// ============================================================
+   135→export default function SmartFinanceDashboard() {
+   136→  const [transactions, setTransactions] = useState<Transaction[]>([]);
+   137→  const [settings, setSettings] = useState<Settings | null>(null);
+   138→  const [report, setReport] = useState<ReportData | null>(null);
+   139→  const [loading, setLoading] = useState(true);
+   140→  const [activeTab, setActiveTab] = useState("dashboard");
+   141→
+   142→  // Settings form state
+   143→  const [editSettings, setEditSettings] = useState({
+   144→    needsPercent: 50,
+   145→    wantsPercent: 30,
+   146→    savingsPercent: 20,
+   147→    savingsCardNumber: "",
+   148→    paymentService: "payme",
+   149→  });
+   150→  const [savingSettings, setSavingSettings] = useState(false);
+   151→
+   152→  // SMS parser state
+   153→  const [smsInput, setSmsInput] = useState("");
+   154→  const [parsedResult, setParsedResult] = useState<any>(null);
+   155→  const [parsing, setParsing] = useState(false);
+   156→
+   157→  // Manual add state
+   158→  const [manualAmount, setManualAmount] = useState("");
+   159→  const [manualBank, setManualBank] = useState("");
+   160→  const [showAddDialog, setShowAddDialog] = useState(false);
+   161→  const [addingManual, setAddingManual] = useState(false);
+   162→
+   163→  // Confirm dialog
+   164→  const [confirmTx, setConfirmTx] = useState<Transaction | null>(null);
+   165→
+   166→  const fetchData = useCallback(async () => {
+   167→    try {
+   168→      const [txRes, setRes, repRes] = await Promise.all([
+   169→        fetch("/api/transactions"),
+   170→        fetch("/api/settings"),
+   171→        fetch("/api/report"),
+   172→      ]);
+   173→      const txData = await txRes.json();
+   174→      const setData = await setRes.json();
+   175→      const repData = await repRes.json();
+   176→
+   177→      setTransactions(Array.isArray(txData) ? txData : []);
+   178→      setSettings(setData);
+   179→      setReport(repData);
+   180→
+   181→      if (setData) {
+   182→        setEditSettings({
+   183→          needsPercent: setData.needsPercent,
+   184→          wantsPercent: setData.wantsPercent,
+   185→          savingsPercent: setData.savingsPercent,
+   186→          savingsCardNumber: setData.savingsCardNumber,
+   187→          paymentService: setData.paymentService,
+   188→        });
+   189→      }
+   190→    } catch (e) {
+   191→      console.error(e);
+   192→    } finally {
+   193→      setLoading(false);
+   194→    }
+   195→  }, []);
+   196→
+   197→  useEffect(() => {
+   198→    fetchData();
+   199→  }, [fetchData]);
+   200→
+   201→  const handleParseSMS = async () => {
+   202→    if (!smsInput.trim()) return;
+   203→    setParsing(true);
+   204→    setParsedResult(null);
+   205→    try {
+   206→      const res = await fetch("/api/parse-sms", {
+   207→        method: "POST",
+   208→        headers: { "Content-Type": "application/json" },
+   209→        body: JSON.stringify({ sms: smsInput }),
+   210→      });
+   211→      const data = await res.json();
+   212→      setParsedResult(data);
+   213→      if (data.parsed) {
+   214→        toast.success("SMS muvaffaqiyatli tahlil qilindi!");
+   215→        fetchData();
+   216→      } else {
+   217→        toast.error(data.error || "Tahlil qilinmadi");
+   218→      }
+   219→    } catch {
+   220→      toast.error("Xatolik yuz berdi");
+   221→    } finally {
+   222→      setParsing(false);
+   223→    }
+   224→  };
+   225→
+   226→  const handleSaveSettings = async () => {
+   227→    setSavingSettings(true);
+   228→    try {
+   229→      const res = await fetch("/api/settings", {
+   230→        method: "PUT",
+   231→        headers: { "Content-Type": "application/json" },
+   232→        body: JSON.stringify(editSettings),
+   233→      });
+   234→      if (res.ok) {
+   235→        toast.success("Sozlamalar saqlandi!");
+   236→        fetchData();
+   237→      } else {
+   238→        const data = await res.json();
+   239→        toast.error(data.error || "Xatolik");
+   240→      }
+   241→    } catch {
+   242→      toast.error("Xatolik yuz berdi");
+   243→    } finally {
+   244→      setSavingSettings(false);
+   245→    }
+   246→  };
+   247→
+   248→  const handleConfirmTransfer = async (txId: string) => {
+   249→    try {
+   250→      await fetch(`/api/transactions/${txId}`, {
+   251→        method: "PATCH",
+   252→        headers: { "Content-Type": "application/json" },
+   253→        body: JSON.stringify({ savingsTransferred: true }),
+   254→      });
+   255→      toast.success("O'tkazma tasdiqlandi!");
+   256→      setConfirmTx(null);
+   257→      fetchData();
+   258→    } catch {
+   259→      toast.error("Xatolik");
+   260→    }
+   261→  };
+   262→
+   263→  const handleDeleteTx = async (txId: string) => {
+   264→    try {
+   265→      await fetch(`/api/transactions/${txId}`, { method: "DELETE" });
+   266→      toast.success("O'chirildi");
+   267→      fetchData();
+   268→    } catch {
+   269→      toast.error("Xatolik");
+   270→    }
+   271→  };
+   272→
+   273→  const handleManualAdd = async () => {
+   274→    if (!manualAmount) return;
+   275→    setAddingManual(true);
+   276→    try {
+   277→      const res = await fetch("/api/transactions", {
+   278→        method: "POST",
+   279→        headers: { "Content-Type": "application/json" },
+   280→        body: JSON.stringify({
+   281→          amount: parseInt(manualAmount.replace(/\s/g, ""), 10),
+   282→          bankName: manualBank || "Qo'lda kiritilgan",
+   283→        }),
+   284→      });
+   285→      if (res.ok) {
+   286→        toast.success("Operatsiya qo'shildi!");
+   287→        setShowAddDialog(false);
+   288→        setManualAmount("");
+   289→        setManualBank("");
+   290→        fetchData();
+   291→      }
+   292→    } catch {
+   293→      toast.error("Xatolik");
+   294→    } finally {
+   295→      setAddingManual(false);
+   296→    }
+   297→  };
+   298→
+   299→  const handleSeed = async () => {
+   300→    try {
+   301→      const res = await fetch("/api/seed", { method: "POST" });
+   302→      const data = await res.json();
+   303→      if (data.success) {
+   304→        toast.success(data.message);
+   305→        fetchData();
+   306→      }
+   307→    } catch {
+   308→      toast.error("Xatolik");
+   309→    }
+   310→  };
+   311→
+   312→  const handleCopyLink = (link: string) => {
+   313→    navigator.clipboard.writeText(link);
+   314→    toast.success("Havola nusxalandi!");
+   315→  };
+   316→
+   317→  if (loading) {
+   318→    return <DashboardSkeleton />;
+   319→  }
+   320→
+   321→  const pieData = report
+   322→    ? [
+   323→        { name: "Ehtiyojlar", value: report.month.totalNeeds, color: NEEDS_COLOR },
+   324→        { name: "Xohish-istaklar", value: report.month.totalWants, color: WANTS_COLOR },
+   325→        { name: "Tejash", value: report.month.totalSavings, color: SAVINGS_COLOR },
+   326→      ].filter((d) => d.value > 0)
+   327→    : [];
+   328→
+   329→  return (
+   330→    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+   331→      <Toaster position="top-right" richColors />
+   332→
+   333→      {/* Header */}
+   334→      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200/60">
+   335→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+   336→          <div className="flex items-center gap-3">
+   337→            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+   338→              <Wallet className="w-5 h-5 text-white" />
+   339→            </div>
+   340→            <div>
+   341→              <h1 className="text-lg font-bold text-gray-900 leading-tight">Smart Finance</h1>
+   342→              <p className="text-xs text-gray-500 hidden sm:block">Moliyaviy avtomatlashtirish</p>
+   343→            </div>
+   344→          </div>
+   345→          <div className="flex items-center gap-2">
+   346→            <Button
+   347→              variant="outline"
+   348→              size="sm"
+   349→              onClick={handleSeed}
+   350→              className="text-xs hidden sm:flex"
+   351→            >
+   352→              <Zap className="w-3.5 h-3.5 mr-1.5" />
+   353→              Namuna ma'lumotlar
+   354→            </Button>
+   355→            <Button
+   356→              size="sm"
+   357→              onClick={() => setShowAddDialog(true)}
+   358→              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25"
+   359→            >
+   360→              <Plus className="w-4 h-4 mr-1.5" />
+   361→              <span className="hidden sm:inline">Qo'shish</span>
+   362→            </Button>
+   363→          </div>
+   364→        </div>
+   365→      </header>
+   366→
+   367→      {/* Main Content */}
+   368→      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+   369→        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+   370→          <TabsList className="grid w-full grid-cols-4 mb-6 bg-white border border-gray-200/60 p-1 rounded-xl shadow-sm">
+   371→            <TabsTrigger value="dashboard" className="text-xs sm:text-sm rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+   372→              <BarChart3 className="w-3.5 h-3.5 mr-1 hidden sm:block" />
+   373→              Boshqaruv paneli
+   374→            </TabsTrigger>
+   375→            <TabsTrigger value="sms" className="text-xs sm:text-sm rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+   376→              <MessageSquare className="w-3.5 h-3.5 mr-1 hidden sm:block" />
+   377→              SMS Tahlil
+   378→            </TabsTrigger>
+   379→            <TabsTrigger value="transactions" className="text-xs sm:text-sm rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+   380→              <Clock className="w-3.5 h-3.5 mr-1 hidden sm:block" />
+   381→              Tarix
+   382→            </TabsTrigger>
+   383→            <TabsTrigger value="settings" className="text-xs sm:text-sm rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+   384→              <Settings2 className="w-3.5 h-3.5 mr-1 hidden sm:block" />
+   385→              Sozlamalar
+   386→            </TabsTrigger>
+   387→          </TabsList>
+   388→
+   389→          {/* Dashboard Tab */}
+   390→          <TabsContent value="dashboard" className="space-y-6">
+   391→            {/* Stats Cards */}
+   392→            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   393→              <StatCard
+   394→                title="Oylik tushum"
+   395→                value={formatMoney(report?.month.totalIncome ?? 0)}
+   396→                icon={<TrendingUp className="w-5 h-5" />}
+   397→                color="emerald"
+   398→                subtitle={`${report?.month.transactionCount ?? 0} ta operatsiya`}
+   399→              />
+   400→              <StatCard
+   401→                title="Ehtiyojlar"
+   402→                value={formatMoney(report?.month.totalNeeds ?? 0)}
+   403→                icon={<ShoppingCart className="w-5 h-5" />}
+   404→                color="amber"
+   405→                subtitle={`${settings?.needsPercent ?? 50}%`}
+   406→              />
+   407→              <StatCard
+   408→                title="Xohish-istaklar"
+   409→                value={formatMoney(report?.month.totalWants ?? 0)}
+   410→                icon={<Wallet className="w-5 h-5" />}
+   411→                color="violet"
+   412→                subtitle={`${settings?.wantsPercent ?? 30}%`}
+   413→              />
+   414→              <StatCard
+   415→                title="Tejash"
+   416→                value={formatMoney(report?.month.totalSavings ?? 0)}
+   417→                icon={<PiggyBank className="w-5 h-5" />}
+   418→                color="green"
+   419→                subtitle={`O'tkazilgan: ${formatMoney(report?.month.transferredSavings ?? 0)}`}
+   420→              />
+   421→            </div>
+   422→
+   423→            {/* Charts Row */}
+   424→            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+   425→              {/* Pie Chart */}
+   426→              <Card className="lg:col-span-2 border-0 shadow-lg bg-white">
+   427→                <CardHeader className="pb-2">
+   428→                  <CardTitle className="text-base font-semibold">50/30/20 Qoidasi</CardTitle>
+   429→                  <CardDescription>Oylik byudjet taqsimoti</CardDescription>
+   430→                </CardHeader>
+   431→                <CardContent>
+   432→                  {pieData.length > 0 ? (
+   433→                    <div className="relative">
+   434→                      <ResponsiveContainer width="100%" height={220}>
+   435→                        <PieChart>
+   436→                          <Pie
+   437→                            data={pieData}
+   438→                            cx="50%"
+   439→                            cy="50%"
+   440→                            innerRadius={55}
+   441→                            outerRadius={90}
+   442→                            paddingAngle={3}
+   443→                            dataKey="value"
+   444→                            strokeWidth={0}
+   445→                          >
+   446→                            {pieData.map((entry, i) => (
+   447→                              <Cell key={i} fill={entry.color} />
+   448→                            ))}
+   449→                          </Pie>
+   450→                          <Tooltip
+   451→                            formatter={(value: number) => formatMoney(value)}
+   452→                            contentStyle={{
+   453→                              borderRadius: "12px",
+   454→                              border: "1px solid #e5e7eb",
+   455→                              boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+   456→                            }}
+   457→                          />
+   458→                        </PieChart>
+   459→                      </ResponsiveContainer>
+   460→                      <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+   461→                        <span className="text-xs text-gray-500">Jami</span>
+   462→                        <span className="text-sm font-bold text-gray-900">
+   463→                          {formatMoney(report?.month.totalIncome ?? 0)}
+   464→                        </span>
+   465→                      </div>
+   466→                    </div>
+   467→                  ) : (
+   468→                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+   469→                      Hali ma&apos;lumot yo&apos;q
+   470→                    </div>
+   471→                  )}
+   472→                  <div className="flex justify-center gap-4 mt-2">
+   473→                    <LegendDot color={NEEDS_COLOR} label="Ehtiyojlar" />
+   474→                    <LegendDot color={WANTS_COLOR} label="Xohish-istaklar" />
+   475→                    <LegendDot color={SAVINGS_COLOR} label="Tejash" />
+   476→                  </div>
+   477→                </CardContent>
+   478→              </Card>
+   479→
+   480→              {/* Bar Chart */}
+   481→              <Card className="lg:col-span-3 border-0 shadow-lg bg-white">
+   482→                <CardHeader className="pb-2">
+   483→                  <div className="flex items-center justify-between">
+   484→                    <div>
+   485→                      <CardTitle className="text-base font-semibold">Kunlik tushumlar</CardTitle>
+   486→                      <CardDescription>So&apos;nggi 14 kun</CardDescription>
+   487→                    </div>
+   488→                  </div>
+   489→                </CardHeader>
+   490→                <CardContent>
+   491→                  <ResponsiveContainer width="100%" height={260}>
+   492→                    <BarChart data={report?.dailyStats ?? []} barCategoryGap="20%">
+   493→                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+   494→                      <XAxis
+   495→                        dataKey="date"
+   496→                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+   497→                        axisLine={false}
+   498→                        tickLine={false}
+   499→                      />
+   500→                      <YAxis
+   501→                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+   502→                        axisLine={false}
+   503→                        tickLine={false}
+   504→                        tickFormatter={(v: number) => {
+   505→                          if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+   506→                          if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+   507→                          return String(v);
+   508→                        }}
+   509→                      />
+   510→                      <Tooltip
+   511→                        formatter={(value: number) => formatMoney(value)}
+   512→                        contentStyle={{
+   513→                          borderRadius: "12px",
+   514→                          border: "1px solid #e5e7eb",
+   515→                          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+   516→                        }}
+   517→                      />
+   518→                      <Bar dataKey="income" fill="#10b981" radius={[6, 6, 0, 0]} name="Tushum" />
+   519→                      <Bar dataKey="savings" fill="#f59e0b" radius={[6, 6, 0, 0]} name="Tejash" />
+   520→                    </BarChart>
+   521→                  </ResponsiveContainer>
+   522→                </CardContent>
+   523→              </Card>
+   524→            </div>
+   525→
+   526→            {/* Weekly Summary + Bank Breakdown */}
+   527→            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+   528→              {/* Weekly Summary */}
+   529→              <Card className="border-0 shadow-lg bg-white">
+   530→                <CardHeader className="pb-3">
+   531→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   532→                    <BarChart3 className="w-4 h-4 text-emerald-600" />
+   533→                    Haftalik hisobot
+   534→                  </CardTitle>
+   535→                </CardHeader>
+   536→                <CardContent className="space-y-3">
+   537→                  <WeeklyRow label="Jami tushum" value={report?.week.totalIncome ?? 0} color="emerald" />
+   538→                  <WeeklyRow label="Ehtiyojlar" value={report?.week.totalNeeds ?? 0} color="amber" />
+   539→                  <WeeklyRow label="Xohish-istaklar" value={report?.week.totalWants ?? 0} color="violet" />
+   540→                  <WeeklyRow label="Tejash" value={report?.week.totalSavings ?? 0} color="green" />
+   541→                  <Separator />
+   542→                  <div className="flex items-center justify-between text-sm text-gray-500">
+   543→                    <span>Operatsiyalar soni</span>
+   544→                    <span className="font-medium text-gray-900">
+   545→                      {report?.week.transactionCount ?? 0} ta
+   546→                    </span>
+   547→                  </div>
+   548→                </CardContent>
+   549→              </Card>
+   550→
+   551→              {/* Bank Breakdown */}
+   552→              <Card className="border-0 shadow-lg bg-white">
+   553→                <CardHeader className="pb-3">
+   554→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   555→                    <Building2 className="w-4 h-4 text-emerald-600" />
+   556→                    Banklar bo&apos;yicha
+   557→                  </CardTitle>
+   558→                </CardHeader>
+   559→                <CardContent>
+   560→                  {report && Object.keys(report.bankStats).length > 0 ? (
+   561→                    <div className="space-y-3">
+   562→                      {Object.entries(report.bankStats)
+   563→                        .sort((a, b) => b[1].total - a[1].total)
+   564→                        .map(([bank, stats]) => (
+   565→                          <div key={bank} className="flex items-center justify-between">
+   566→                            <div className="flex items-center gap-2">
+   567→                              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+   568→                                <Building2 className="w-4 h-4 text-gray-600" />
+   569→                              </div>
+   570→                              <div>
+   571→                                <p className="text-sm font-medium text-gray-900">{bank}</p>
+   572→                                <p className="text-xs text-gray-500">{stats.count} ta operatsiya</p>
+   573→                              </div>
+   574→                            </div>
+   575→                            <span className="text-sm font-semibold text-gray-900">
+   576→                              {formatMoney(stats.total)}
+   577→                            </span>
+   578→                          </div>
+   579→                        ))}
+   580→                    </div>
+   581→                  ) : (
+   582→                    <div className="text-center text-gray-400 text-sm py-8">
+   583→                      Hali ma&apos;lumot yo&apos;q
+   584→                    </div>
+   585→                  )}
+   586→                </CardContent>
+   587→              </Card>
+   588→            </div>
+   589→
+   590→            {/* Telegram Bot Info */}
+   591→            <Card className="border-0 shadow-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+   592→              <CardContent className="py-6">
+   593→                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+   594→                  <div className="flex items-center gap-4">
+   595→                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+   596→                      <Bot className="w-6 h-6" />
+   597→                    </div>
+   598→                    <div>
+   599→                      <h3 className="font-bold text-lg">Telegram Bot Integration</h3>
+   600→                      <p className="text-emerald-100 text-sm mt-0.5">
+   601→                        MacroDroid orqali SMS avtomatik tahlil qilinadi va hisobot yuboriladi
+   602→                      </p>
+   603→                    </div>
+   604→                  </div>
+   605→                  <div className="flex gap-2">
+   606→                    <Badge variant="secondary" className="bg-white/20 text-white border-0">
+   607→                      <ShieldCheck className="w-3 h-3 mr-1" />
+   608→                      Faol
+   609→                    </Badge>
+   610→                    <Badge variant="secondary" className="bg-white/20 text-white border-0">
+   611→                      <Clock className="w-3 h-3 mr-1" />
+   612→                      Har Yakshanba 20:00
+   613→                    </Badge>
+   614→                  </div>
+   615→                </div>
+   616→                <div className="mt-4 p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+   617→                  <p className="text-sm text-emerald-50">
+   618→                    <strong>Ishlash tartibi:</strong> Bank SMS → MacroDroid o&apos;qiydi → Bot API&apos;ga yuboradi → 50/30/20 hisoblaydi → Telegram&apos;ga xabar + Tasdiqlash tugmalari → To&apos;lov havolasi generatsiya qilinadi
+   619→                  </p>
+   620→                </div>
+   621→              </CardContent>
+   622→            </Card>
+   623→          </TabsContent>
+   624→
+   625→          {/* SMS Parser Tab */}
+   626→          <TabsContent value="sms" className="space-y-6">
+   627→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   628→              <Card className="border-0 shadow-lg bg-white">
+   629→                <CardHeader>
+   630→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   631→                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+   632→                    SMS Tahlil qilish
+   633→                  </CardTitle>
+   634→                  <CardDescription>
+   635→                    Bank SMS matnini joylashtiring, bot avtomatik pul miqdorini aniqlaydi va 50/30/20 bo&apos;linadi
+   636→                  </CardDescription>
+   637→                </CardHeader>
+   638→                <CardContent className="space-y-4">
+   639→                  <Textarea
+   640→                    placeholder="Masalan: Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi."
+   641→                    value={smsInput}
+   642→                    onChange={(e) => setSmsInput(e.target.value)}
+   643→                    className="min-h-[120px] resize-none text-sm"
+   644→                  />
+   645→                  <div className="flex gap-2">
+   646→                    <Button
+   647→                      onClick={handleParseSMS}
+   648→                      disabled={parsing || !smsInput.trim()}
+   649→                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+   650→                    >
+   651→                      {parsing ? (
+   652→                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+   653→                      ) : (
+   654→                        <Send className="w-4 h-4 mr-2" />
+   655→                      )}
+   656→                      Tahlil qilish
+   657→                    </Button>
+   658→                  </div>
+   659→
+   660→                  {/* Sample SMS buttons */}
+   661→                  <div>
+   662→                    <p className="text-xs text-gray-500 mb-2">Namuna SMS:</p>
+   663→                    <div className="flex flex-wrap gap-2">
+   664→                      {[
+   665→                        "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
+   666→                        "Kapitalbank: Kartangizga 1,250,000 so'm tushdi. Karta ****4567. Balans: 3,200,000 so'm.",
+   667→                        "TBC Bank: Hisobingizga 320,000 so'm o'tkazildi. Karta ****8901.",
+   668→                      ].map((sms, i) => (
+   669→                        <button
+   670→                          key={i}
+   671→                          onClick={() => setSmsInput(sms)}
+   672→                          className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-gray-600 max-w-full truncate"
+   673→                        >
+   674→                          Namuna {i + 1}
+   675→                        </button>
+   676→                      ))}
+   677→                    </div>
+   678→                  </div>
+   679→                </CardContent>
+   680→              </Card>
+   681→
+   682→              {/* Parsed Result */}
+   683→              <Card className="border-0 shadow-lg bg-white">
+   684→                <CardHeader>
+   685→                  <CardTitle className="text-base font-semibold">Natija</CardTitle>
+   686→                </CardHeader>
+   687→                <CardContent>
+   688→                  {parsedResult ? (
+   689→                    parsedResult.parsed ? (
+   690→                      <motion.div
+   691→                        initial={{ opacity: 0, y: 10 }}
+   692→                        animate={{ opacity: 1, y: 0 }}
+   693→                        className="space-y-4"
+   694→                      >
+   695→                        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+   696→                          <div className="flex items-center gap-2 mb-3">
+   697→                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+   698→                            <span className="font-semibold text-emerald-800">
+   699→                              {formatMoney(parsedResult.transaction.amount)} tushdi
+   700→                            </span>
+   701→                          </div>
+   702→                          <p className="text-sm text-emerald-700">
+   703→                            Bank: {parsedResult.transaction.bankName}
+   704→                            {parsedResult.transaction.cardLast4 && (
+   705→                              <span className="ml-2">
+   706→                                Karta: ****{parsedResult.transaction.cardLast4}
+   707→                              </span>
+   708→                            )}
+   709→                          </p>
+   710→                        </div>
+   711→
+   712→                        <div className="space-y-2">
+   713→                          <h4 className="text-sm font-medium text-gray-700">Hisob-kitob:</h4>
+   714→                          <BreakdownRow
+   715→                            label="Ehtiyojlar"
+   716→                            pct={parsedResult.breakdown.needs.percent}
+   717→                            amount={parsedResult.breakdown.needs.amount}
+   718→                            color={NEEDS_COLOR}
+   719→                          />
+   720→                          <BreakdownRow
+   721→                            label="Xohish-istaklar"
+   722→                            pct={parsedResult.breakdown.wants.percent}
+   723→                            amount={parsedResult.breakdown.wants.amount}
+   724→                            color={WANTS_COLOR}
+   725→                          />
+   726→                          <BreakdownRow
+   727→                            label="Tejash"
+   728→                            pct={parsedResult.breakdown.savings.percent}
+   729→                            amount={parsedResult.breakdown.savings.amount}
+   730→                            color={SAVINGS_COLOR}
+   731→                          />
+   732→                        </div>
+   733→
+   734→                        {parsedResult.transaction.paymentLink && (
+   735→                          <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
+   736→                            <p className="text-xs text-gray-500 mb-2">To&apos;lov havolasi:</p>
+   737→                            <div className="flex items-center gap-2">
+   738→                              <code className="text-xs flex-1 text-emerald-700 bg-white p-2 rounded-lg border truncate">
+   739→                                {parsedResult.transaction.paymentLink}
+   740→                              </code>
+   741→                              <Button
+   742→                                size="sm"
+   743→                                variant="outline"
+   744→                                onClick={() =>
+   745→                                  handleCopyLink(parsedResult.transaction.paymentLink)
+   746→                                }
+   747→                              >
+   748→                                <Copy className="w-3.5 h-3.5" />
+   749→                              </Button>
+   750→                            </div>
+   751→                          </div>
+   752→                        )}
+   753→                      </motion.div>
+   754→                    ) : (
+   755→                      <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+   756→                        <div className="flex items-center gap-2">
+   757→                          <XCircle className="w-5 h-5 text-red-500" />
+   758→                          <span className="text-red-700">{parsedResult.error}</span>
+   759→                        </div>
+   760→                      </div>
+   761→                    )
+   762→                  ) : (
+   763→                    <div className="text-center py-12 text-gray-400">
+   764→                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   765→                      <p className="text-sm">SMS matnini kiriting va &quot;Tahlil qilish&quot; tugmasini bosing</p>
+   766→                    </div>
+   767→                  )}
+   768→                </CardContent>
+   769→              </Card>
+   770→            </div>
+   771→          </TabsContent>
+   772→
+   773→          {/* Transactions Tab */}
+   774→          <TabsContent value="transactions" className="space-y-4">
+   775→            <div className="flex items-center justify-between">
+   776→              <div>
+   777→                <h2 className="text-lg font-bold text-gray-900">Operatsiyalar tarixi</h2>
+   778→                <p className="text-sm text-gray-500">
+   779→                  Jami {transactions.length} ta operatsiya
+   780→                </p>
+   781→              </div>
+   782→              <Button
+   783→                variant="outline"
+   784→                size="sm"
+   785→                onClick={fetchData}
+   786→              >
+   787→                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+   788→                Yangilash
+   789→              </Button>
+   790→            </div>
+   791→
+   792→            {transactions.length > 0 ? (
+   793→              <div className="space-y-3">
+   794→                <AnimatePresence>
+   795→                  {transactions.map((tx) => (
+   796→                    <motion.div
+   797→                      key={tx.id}
+   798→                      initial={{ opacity: 0, y: 10 }}
+   799→                      animate={{ opacity: 1, y: 0 }}
+   800→                      exit={{ opacity: 0, y: -10 }}
+   801→                    >
+   802→                      <TransactionCard
+   803→                        tx={tx}
+   804→                        onConfirm={() => setConfirmTx(tx)}
+   805→                        onCopyLink={() => handleCopyLink(tx.paymentLink)}
+   806→                        onDelete={() => handleDeleteTx(tx.id)}
+   807→                      />
+   808→                    </motion.div>
+   809→                  ))}
+   810→                </AnimatePresence>
+   811→              </div>
+   812→            ) : (
+   813→              <Card className="border-0 shadow-lg bg-white">
+   814→                <CardContent className="py-16 text-center text-gray-400">
+   815→                  <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   816→                  <p className="text-sm">Hali operatsiya yo&apos;q</p>
+   817→                  <p className="text-xs mt-1">
+   818→                    SMS tahlil qiling yoki &quot;Qo&apos;shish&quot; tugmasini bosing
+   819→                  </p>
+   820→                </CardContent>
+   821→              </Card>
+   822→            )}
+   823→          </TabsContent>
+   824→
+   825→          {/* Settings Tab */}
+   826→          <TabsContent value="settings" className="space-y-6">
+   827→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   828→              {/* Budget Settings */}
+   829→              <Card className="border-0 shadow-lg bg-white">
+   830→                <CardHeader>
+   831→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   832→                    <Settings2 className="w-4 h-4 text-emerald-600" />
+   833→                    Byudjet foizlari
+   834→                  </CardTitle>
+   835→                  <CardDescription>
+   836→                    50/30/20 qoidasini o&apos;zgartiring. Foizlar yig&apos;indisi 100 bo&apos;lishi kerak.
+   837→                  </CardDescription>
+   838→                </CardHeader>
+   839→                <CardContent className="space-y-6">
+   840→                  {/* Needs */}
+   841→                  <div className="space-y-2">
+   842→                    <div className="flex items-center justify-between">
+   843→                      <Label className="flex items-center gap-2">
+   844→                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: NEEDS_COLOR }} />
+   845→                        Ehtiyojlar
+   846→                      </Label>
+   847→                      <span className="text-sm font-bold" style={{ color: NEEDS_COLOR }}>
+   848→                        {editSettings.needsPercent}%
+   849→                      </span>
+   850→                    </div>
+   851→                    <Slider
+   852→                      value={[editSettings.needsPercent]}
+   853→                      onValueChange={([v]) =>
+   854→                        setEditSettings((p) => ({
+   855→                          ...p,
+   856→                          needsPercent: v,
+   857→                          savingsPercent: 100 - v - p.wantsPercent,
+   858→                        }))
+   859→                      }
+   860→                      max={100}
+   861→                      min={0}
+   862→                      step={1}
+   863→                      className="[&_[role=slider]]:bg-amber-500"
+   864→                    />
+   865→                  </div>
+   866→
+   867→                  {/* Wants */}
+   868→                  <div className="space-y-2">
+   869→                    <div className="flex items-center justify-between">
+   870→                      <Label className="flex items-center gap-2">
+   871→                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: WANTS_COLOR }} />
+   872→                        Xohish-istaklar
+   873→                      </Label>
+   874→                      <span className="text-sm font-bold" style={{ color: WANTS_COLOR }}>
+   875→                        {editSettings.wantsPercent}%
+   876→                      </span>
+   877→                    </div>
+   878→                    <Slider
+   879→                      value={[editSettings.wantsPercent]}
+   880→                      onValueChange={([v]) =>
+   881→                        setEditSettings((p) => ({
+   882→                          ...p,
+   883→                          wantsPercent: v,
+   884→                          savingsPercent: 100 - p.needsPercent - v,
+   885→                        }))
+   886→                      }
+   887→                      max={100}
+   888→                      min={0}
+   889→                      step={1}
+   890→                      className="[&_[role=slider]]:bg-violet-500"
+   891→                    />
+   892→                  </div>
+   893→
+   894→                  {/* Savings */}
+   895→                  <div className="space-y-2">
+   896→                    <div className="flex items-center justify-between">
+   897→                      <Label className="flex items-center gap-2">
+   898→                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: SAVINGS_COLOR }} />
+   899→                        Tejash
+   900→                      </Label>
+   901→                      <span className="text-sm font-bold" style={{ color: SAVINGS_COLOR }}>
+   902→                        {editSettings.savingsPercent}%
+   903→                      </span>
+   904→                    </div>
+   905→                    <Slider
+   906→                      value={[editSettings.savingsPercent]}
+   907→                      onValueChange={([v]) =>
+   908→                        setEditSettings((p) => ({
+   909→                          ...p,
+   910→                          savingsPercent: v,
+   911→                          wantsPercent: 100 - p.needsPercent - v,
+   912→                        }))
+   913→                      }
+   914→                      max={100}
+   915→                      min={0}
+   916→                      step={1}
+   917→                      className="[&_[role=slider]]:bg-emerald-500"
+   918→                    />
+   919→                  </div>
+   920→
+   921→                  {/* Percentage bar */}
+   922→                  <div className="h-3 rounded-full overflow-hidden flex bg-gray-100">
+   923→                    <div
+   924→                      className="h-full transition-all duration-300"
+   925→                      style={{
+   926→                        width: `${editSettings.needsPercent}%`,
+   927→                        backgroundColor: NEEDS_COLOR,
+   928→                      }}
+   929→                    />
+   930→                    <div
+   931→                      className="h-full transition-all duration-300"
+   932→                      style={{
+   933→                        width: `${editSettings.wantsPercent}%`,
+   934→                        backgroundColor: WANTS_COLOR,
+   935→                      }}
+   936→                    />
+   937→                    <div
+   938→                      className="h-full transition-all duration-300"
+   939→                      style={{
+   940→                        width: `${editSettings.savingsPercent}%`,
+   941→                        backgroundColor: SAVINGS_COLOR,
+   942→                      }}
+   943→                    />
+   944→                  </div>
+   945→
+   946→                  <div className="flex items-center justify-between text-xs text-gray-500">
+   947→                    <span>
+   948→                      Jami: {editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent}%
+   949→                    </span>
+   950→                    {editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent !== 100 && (
+   951→                      <span className="text-red-500 font-medium">
+   952→                        Foizlar 100 bo&apos;lishi kerak!
+   953→                      </span>
+   954→                    )}
+   955→                  </div>
+   956→
+   957→                  <Button
+   958→                    onClick={handleSaveSettings}
+   959→                    disabled={
+   960→                      savingSettings ||
+   961→                      editSettings.needsPercent +
+   962→                        editSettings.wantsPercent +
+   963→                        editSettings.savingsPercent !==
+   964→                        100
+   965→                    }
+   966→                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+   967→                  >
+   968→                    {savingSettings ? (
+   969→                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+   970→                    ) : null}
+   971→                    Saqlash
+   972→                  </Button>
+   973→                </CardContent>
+   974→              </Card>
+   975→
+   976→              {/* Payment Settings */}
+   977→              <Card className="border-0 shadow-lg bg-white">
+   978→                <CardHeader>
+   979→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   980→                    <Send className="w-4 h-4 text-emerald-600" />
+   981→                    To&apos;lov sozlamalari
+   982→                  </CardTitle>
+   983→                  <CardDescription>
+   984→                    Tejash kartasi ma&apos;lumotlarini kiriting, to&apos;lov havolasi avtomatik generatsiya bo&apos;lsin
+   985→                  </CardDescription>
+   986→                </CardHeader>
+   987→                <CardContent className="space-y-4">
+   988→                  <div className="space-y-2">
+   989→                    <Label>Tejash karta raqami</Label>
+   990→                    <Input
+   991→                      placeholder="8600 1234 5678 9012"
+   992→                      value={editSettings.savingsCardNumber}
+   993→                      onChange={(e) =>
+   994→                        setEditSettings((p) => ({
+   995→                          ...p,
+   996→                          savingsCardNumber: e.target.value,
+   997→                        }))
+   998→                      }
+   999→                      className="text-sm"
+  1000→                    />
+  1001→                  </div>
+  1002→
+  1003→                  <div className="space-y-2">
+  1004→                    <Label>To&apos;lov xizmati</Label>
+  1005→                    <Select
+  1006→                      value={editSettings.paymentService}
+  1007→                      onValueChange={(v) =>
+  1008→                        setEditSettings((p) => ({ ...p, paymentService: v }))
+  1009→                      }
+  1010→                    >
+  1011→                      <SelectTrigger>
+  1012→                        <SelectValue />
+  1013→                      </SelectTrigger>
+  1014→                      <SelectContent>
+  1015→                        <SelectItem value="payme">Payme</SelectItem>
+  1016→                        <SelectItem value="click">Click</SelectItem>
+  1017→                      </SelectContent>
+  1018→                    </Select>
+  1019→                  </div>
+  1020→
+  1021→                  <Button
+  1022→                    onClick={handleSaveSettings}
+  1023→                    disabled={savingSettings}
+  1024→                    variant="outline"
+  1025→                    className="w-full"
+  1026→                  >
+  1027→                    {savingSettings ? (
+  1028→                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+  1029→                    ) : null}
+  1030→                    To&apos;lov sozlamalarini saqlash
+  1031→                  </Button>
+  1032→
+  1033→                  <Separator />
+  1034→
+  1035→                  {/* Telegram Bot Info */}
+  1036→                  <div className="space-y-3">
+  1037→                    <h4 className="text-sm font-medium flex items-center gap-2">
+  1038→                      <Bot className="w-4 h-4 text-emerald-600" />
+  1039→                      Telegram Bot sozlamalari
+  1040→                    </h4>
+  1041→                    <div className="p-3 rounded-xl bg-gray-50 border text-xs text-gray-600 space-y-2">
+  1042→                      <p>
+  1043→                        <strong>1.</strong> BotFather orqali Telegram bot yarating va token oling
+  1044→                      </p>
+  1045→                      <p>
+  1046→                        <strong>2.</strong> Token va Chat ID ni &quot;Sozlamalar&quot; sahifasiga kiriting
+  1047→                      </p>
+  1048→                      <p>
+  1049→                        <strong>3.</strong> MacroDroid ilovasida quyidagi makro yarating:
+  1050→                      </p>
+  1051→                      <div className="bg-white p-2 rounded-lg border font-mono text-[11px] space-y-1">
+  1052→                        <p className="text-amber-600">Trigger: SMS kelganda (Bank raqamidan)</p>
+  1053→                        <p className="text-emerald-600">Action: HTTP Request → POST /api/parse-sms</p>
+  1054→                        <p className="text-violet-600">Body: {"{ \"sms\": \"[sms_text]\" }"}</p>
+  1055→                      </div>
+  1056→                      <p>
+  1057→                        <strong>4.</strong> Bot har Yakshanba kuni soat 20:00 da haftalik hisobot yuboradi
+  1058→                      </p>
+  1059→                    </div>
+  1060→                  </div>
+  1061→                </CardContent>
+  1062→              </Card>
+  1063→            </div>
+  1064→          </TabsContent>
+  1065→        </Tabs>
+  1066→      </main>
+  1067→
+  1068→      {/* Footer */}
+  1069→      <footer className="mt-auto border-t border-gray-200/60 bg-white/80 backdrop-blur-lg">
+  1070→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
+  1071→          <p>Smart Finance Bot &copy; {new Date().getFullYear()} — Shaxsiy moliyaviy avtomatlashtirish</p>
+  1072→          <div className="flex items-center gap-3">
+  1073→            <span className="flex items-center gap-1">
+  1074→              <ShieldCheck className="w-3 h-3 text-emerald-500" />
+  1075→              Ma&apos;lumotlar mahalliy saqlanadi
+  1076→            </span>
+  1077→          </div>
+  1078→        </div>
+  1079→      </footer>
+  1080→
+  1081→      {/* Confirm Transfer Dialog */}
+  1082→      <Dialog open={!!confirmTx} onOpenChange={() => setConfirmTx(null)}>
+  1083→        <DialogContent className="sm:max-w-md">
+  1084→          <DialogHeader>
+  1085→            <DialogTitle>O&apos;tkazmani tasdiqlash</DialogTitle>
+  1086→            <DialogDescription>
+  1087→              Tejash kartasiga{" "}
+  1088→              <strong>{confirmTx ? formatMoney(confirmTx.savingsAmount) : ""}</strong> o&apos;tkazishni tasdiqlaysizmi?
+  1089→            </DialogDescription>
+  1090→          </DialogHeader>
+  1091→          <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+  1092→            <div className="flex justify-between">
+  1093→              <span className="text-gray-500">Tushum:</span>
+  1094→              <span className="font-medium">{confirmTx ? formatMoney(confirmTx.amount) : ""}</span>
+  1095→            </div>
+  1096→            <div className="flex justify-between">
+  1097→              <span className="text-gray-500">Tejash miqdori:</span>
+  1098→              <span className="font-medium text-emerald-600">
+  1099→                {confirmTx ? formatMoney(confirmTx.savingsAmount) : ""}
+  1100→              </span>
+  1101→            </div>
+  1102→            <div className="flex justify-between">
+  1103→              <span className="text-gray-500">Bank:</span>
+  1104→              <span className="font-medium">{confirmTx?.bankName}</span>
+  1105→            </div>
+  1106→          </div>
+  1107→          {confirmTx?.paymentLink && (
+  1108→            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+  1109→              <p className="text-xs text-emerald-700 mb-2">To&apos;lov havolasi:</p>
+  1110→              <div className="flex items-center gap-2">
+  1111→                <code className="text-xs flex-1 bg-white p-2 rounded-lg border truncate text-emerald-700">
+  1112→                  {confirmTx.paymentLink}
+  1113→                </code>
+  1114→                <Button size="sm" variant="outline" onClick={() => handleCopyLink(confirmTx.paymentLink)}>
+  1115→                  <Copy className="w-3.5 h-3.5" />
+  1116→                </Button>
+  1117→              </div>
+  1118→            </div>
+  1119→          )}
+  1120→          <DialogFooter className="gap-2">
+  1121→            <Button variant="outline" onClick={() => setConfirmTx(null)}>
+  1122→              <XCircle className="w-4 h-4 mr-1.5" />
+  1123→              Bekor qilish
+  1124→            </Button>
+  1125→            <Button
+  1126→              onClick={() => confirmTx && handleConfirmTransfer(confirmTx.id)}
+  1127→              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+  1128→            >
+  1129→              <CheckCircle2 className="w-4 h-4 mr-1.5" />
+  1130→              Tasdiqlash
+  1131→            </Button>
+  1132→          </DialogFooter>
+  1133→        </DialogContent>
+  1134→      </Dialog>
+  1135→
+  1136→      {/* Add Manual Transaction Dialog */}
+  1137→      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+  1138→        <DialogContent className="sm:max-w-md">
+  1139→          <DialogHeader>
+  1140→            <DialogTitle>Operatsiya qo&apos;shish</DialogTitle>
+  1141→            <DialogDescription>Qo&apos;lda tushum operatsiyasini kiriting</DialogDescription>
+  1142→          </DialogHeader>
+  1143→          <div className="space-y-4">
+  1144→            <div className="space-y-2">
+  1145→              <Label>Miqdor (so&apos;m)</Label>
+  1146→              <Input
+  1147→                type="number"
+  1148→                placeholder="500000"
+  1149→                value={manualAmount}
+  1150→                onChange={(e) => setManualAmount(e.target.value)}
+  1151→              />
+  1152→            </div>
+  1153→            <div className="space-y-2">
+  1154→              <Label>Bank nomi (ixtiyoriy)</Label>
+  1155→              <Input
+  1156→                placeholder="Uzum Bank"
+  1157→                value={manualBank}
+  1158→                onChange={(e) => setManualBank(e.target.value)}
+  1159→              />
+  1160→            </div>
+  1161→          </div>
+  1162→          <DialogFooter className="gap-2">
+  1163→            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+  1164→              Bekor qilish
+  1165→            </Button>
+  1166→            <Button
+  1167→              onClick={handleManualAdd}
+  1168→              disabled={addingManual || !manualAmount}
+  1169→              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+  1170→            >
+  1171→              {addingManual ? (
+  1172→                <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
+  1173→              ) : (
+  1174→                <Plus className="w-4 h-4 mr-1.5" />
+  1175→              )}
+  1176→              Qo&apos;shish
+  1177→            </Button>
+  1178→          </DialogFooter>
+  1179→        </DialogContent>
+  1180→      </Dialog>
+  1181→    </div>
+  1182→  );
+  1183→}
+  1184→
+  1185→// ============================================================
+  1186→// Sub Components
+  1187→// ============================================================
+  1188→
+  1189→function StatCard({
+  1190→  title,
+  1191→  value,
+  1192→  icon,
+  1193→  color,
+  1194→  subtitle,
+  1195→}: {
+  1196→  title: string;
+  1197→  value: string;
+  1198→  icon: React.ReactNode;
+  1199→  color: "emerald" | "amber" | "violet" | "green";
+  1200→  subtitle: string;
+  1201→}) {
+  1202→  const colorMap = {
+  1203→    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  1204→    amber: "bg-amber-50 text-amber-600 border-amber-100",
+  1205→    violet: "bg-violet-50 text-violet-600 border-violet-100",
+  1206→    green: "bg-green-50 text-green-600 border-green-100",
+  1207→  };
+  1208→  const iconBgMap = {
+  1209→    emerald: "bg-emerald-100 text-emerald-600",
+  1210→    amber: "bg-amber-100 text-amber-600",
+  1211→    violet: "bg-violet-100 text-violet-600",
+  1212→    green: "bg-green-100 text-green-600",
+  1213→  };
+  1214→
+  1215→  return (
+  1216→    <Card className="border-0 shadow-lg bg-white overflow-hidden relative">
+  1217→      <CardContent className="p-4 sm:p-5">
+  1218→        <div className="flex items-start justify-between mb-3">
+  1219→          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconBgMap[color]}`}>
+  1220→            {icon}
+  1221→          </div>
+  1222→          <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 border ${colorMap[color]}`}>
+  1223→            {subtitle}
+  1224→          </Badge>
+  1225→        </div>
+  1226→        <p className="text-xs text-gray-500 mb-1">{title}</p>
+  1227→        <p className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">{value}</p>
+  1228→      </CardContent>
+  1229→    </Card>
+  1230→  );
+  1231→}
+  1232→
+  1233→function LegendDot({ color, label }: { color: string; label: string }) {
+  1234→  return (
+  1235→    <div className="flex items-center gap-1.5">
+  1236→      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+  1237→      <span className="text-xs text-gray-600">{label}</span>
+  1238→    </div>
+  1239→  );
+  1240→}
+  1241→
+  1242→function WeeklyRow({
+  1243→  label,
+  1244→  value,
+  1245→  color,
+  1246→}: {
+  1247→  label: string;
+  1248→  value: number;
+  1249→  color: string;
+  1250→}) {
+  1251→  return (
+  1252→    <div className="flex items-center justify-between">
+  1253→      <div className="flex items-center gap-2">
+  1254→        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+  1255→        <span className="text-sm text-gray-600">{label}</span>
+  1256→      </div>
+  1257→      <span className="text-sm font-semibold text-gray-900">{formatMoney(value)}</span>
+  1258→    </div>
+  1259→  );
+  1260→}
+  1261→
+  1262→function BreakdownRow({
+  1263→  label,
+  1264→  pct,
+  1265→  amount,
+  1266→  color,
+  1267→}: {
+  1268→  label: string;
+  1269→  pct: number;
+  1270→  amount: number;
+  1271→  color: string;
+  1272→}) {
+  1273→  return (
+  1274→    <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+  1275→      <div className="flex items-center gap-2">
+  1276→        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+  1277→        <span className="text-sm text-gray-700">{label}</span>
+  1278→      </div>
+  1279→      <div className="text-right">
+  1280→        <div className="text-sm font-semibold text-gray-900">{formatMoney(amount)}</div>
+  1281→        <div className="text-xs text-gray-400">{pct}%</div>
+  1282→      </div>
+  1283→    </div>
+  1284→  );
+  1285→}
+  1286→
+  1287→function TransactionCard({
+  1288→  tx,
+  1289→  onConfirm,
+  1290→  onCopyLink,
+  1291→  onDelete,
+  1292→}: {
+  1293→  tx: Transaction;
+  1294→  onConfirm: () => void;
+  1295→  onCopyLink: () => void;
+  1296→  onDelete: () => void;
+  1297→}) {
+  1298→  const [expanded, setExpanded] = useState(false);
+  1299→
+  1300→  return (
+  1301→    <Card className="border-0 shadow-md bg-white hover:shadow-lg transition-shadow">
+  1302→      <CardContent className="p-4">
+  1303→        <div className="flex items-start justify-between gap-3">
+  1304→          <div className="flex-1 min-w-0">
+  1305→            <div className="flex items-center gap-2 mb-1">
+  1306→              <span className="font-bold text-gray-900">{formatMoney(tx.amount)}</span>
+  1307→              <Badge
+  1308→                variant={tx.savingsTransferred ? "default" : "secondary"}
+  1309→                className={
+  1310→                  tx.savingsTransferred
+  1311→                    ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]"
+  1312→                    : "bg-amber-100 text-amber-700 border-amber-200 text-[10px]"
+  1313→                }
+  1314→              >
+  1315→                {tx.savingsTransferred ? "Tasdiqlangan" : "Kutilmoqda"}
+  1316→              </Badge>
+  1317→            </div>
+  1318→            <div className="flex items-center gap-3 text-xs text-gray-500">
+  1319→              <span className="flex items-center gap-1">
+  1320→                <Building2 className="w-3 h-3" />
+  1321→                {tx.bankName}
+  1322→              </span>
+  1323→              {tx.cardLast4 && <span>****{tx.cardLast4}</span>}
+  1324→              <span className="flex items-center gap-1">
+  1325→                <Clock className="w-3 h-3" />
+  1326→                {new Date(tx.createdAt).toLocaleDateString("uz-UZ", {
+  1327→                  day: "2-digit",
+  1328→                  month: "short",
+  1329→                  hour: "2-digit",
+  1330→                  minute: "2-digit",
+  1331→                })}
+  1332→              </span>
+  1333→            </div>
+  1334→          </div>
+  1335→
+  1336→          <div className="flex items-center gap-1.5 shrink-0">
+  1337→            {!tx.savingsTransferred && (
+  1338→              <Button
+  1339→                size="sm"
+  1340→                variant="outline"
+  1341→                className="h-8 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+  1342→                onClick={onConfirm}
+  1343→              >
+  1344→                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+  1345→                Tasdiqlash
+  1346→              </Button>
+  1347→            )}
+  1348→            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onDelete}>
+  1349→              <Trash2 className="w-3.5 h-3.5 text-gray-400" />
+  1350→            </Button>
+  1351→          </div>
+  1352→        </div>
+  1353→
+  1354→        {/* Expandable breakdown */}
+  1355→        {expanded && (
+  1356→          <motion.div
+  1357→            initial={{ height: 0, opacity: 0 }}
+  1358→            animate={{ height: "auto", opacity: 1 }}
+  1359→            className="mt-3 pt-3 border-t border-gray-100"
+  1360→          >
+  1361→            <div className="grid grid-cols-3 gap-3 mb-3">
+  1362→              <div className="text-center p-2 rounded-lg bg-amber-50">
+  1363→                <p className="text-[10px] text-amber-600 mb-0.5">Ehtiyojlar</p>
+  1364→                <p className="text-sm font-semibold text-amber-700">
+  1365→                  {formatMoney(tx.needsAmount)}
+  1366→                </p>
+  1367→              </div>
+  1368→              <div className="text-center p-2 rounded-lg bg-violet-50">
+  1369→                <p className="text-[10px] text-violet-600 mb-0.5">Xohish-istaklar</p>
+  1370→                <p className="text-sm font-semibold text-violet-700">
+  1371→                  {formatMoney(tx.wantsAmount)}
+  1372→                </p>
+  1373→              </div>
+  1374→              <div className="text-center p-2 rounded-lg bg-emerald-50">
+  1375→                <p className="text-[10px] text-emerald-600 mb-0.5">Tejash</p>
+  1376→                <p className="text-sm font-semibold text-emerald-700">
+  1377→                  {formatMoney(tx.savingsAmount)}
+  1378→                </p>
+  1379→              </div>
+  1380→            </div>
+  1381→
+  1382→            {tx.paymentLink && (
+  1383→              <div className="flex items-center gap-2">
+  1384→                <code className="text-xs flex-1 text-emerald-700 bg-gray-50 p-2 rounded-lg border truncate">
+  1385→                  {tx.paymentLink}
+  1386→                </code>
+  1387→                <Button size="sm" variant="outline" onClick={onCopyLink}>
+  1388→                  <Copy className="w-3 h-3 mr-1" />
+  1389→                  <span className="text-xs">Nusxa</span>
+  1390→                </Button>
+  1391→                <a href={tx.paymentLink} target="_blank" rel="noopener noreferrer">
+  1392→                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+  1393→                    <ExternalLink className="w-3 h-3" />
+  1394→                  </Button>
+  1395→                </a>
+  1396→              </div>
+  1397→            )}
+  1398→
+  1399→            <div className="mt-2 p-2 bg-gray-50 rounded-lg text-xs text-gray-500 max-h-20 overflow-y-auto">
+  1400→              {tx.smsText}
+  1401→            </div>
+  1402→          </motion.div>
+  1403→        )}
+  1404→
+  1405→        <button
+  1406→          onClick={() => setExpanded(!expanded)}
+  1407→          className="mt-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+  1408→        >
+  1409→          <ChevronDown
+  1410→            className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+  1411→          />
+  1412→          Batafsil
+  1413→        </button>
+  1414→      </CardContent>
+  1415→    </Card>
+  1416→  );
+  1417→}
+  1418→
+  1419→function DashboardSkeleton() {
+  1420→  return (
+  1421→    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+  1422→      <header className="h-16 bg-white/80 backdrop-blur-lg border-b border-gray-200/60">
+  1423→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+  1424→          <Skeleton className="w-9 h-9 rounded-xl" />
+  1425→          <div className="ml-3 space-y-1">
+  1426→            <Skeleton className="w-32 h-5" />
+  1427→            <Skeleton className="w-48 h-3 hidden sm:block" />
+  1428→          </div>
+  1429→        </div>
+  1430→      </header>
+  1431→      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  1432→        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  1433→          {[1, 2, 3, 4].map((i) => (
+  1434→            <Card key={i} className="border-0 shadow-lg">
+  1435→              <CardContent className="p-5">
+  1436→                <Skeleton className="w-10 h-10 rounded-xl mb-3" />
+  1437→                <Skeleton className="w-24 h-3 mb-2" />
+  1438→                <Skeleton className="w-full h-6" />
+  1439→              </CardContent>
+  1440→            </Card>
+  1441→          ))}
+  1442→        </div>
+  1443→        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  1444→          <Card className="border-0 shadow-lg">
+  1445→            <CardContent className="p-6">
+  1446→              <Skeleton className="w-40 h-5 mb-4" />
+  1447→              <Skeleton className="w-full h-[260px] rounded-xl" />
+  1448→            </CardContent>
+  1449→          </Card>
+  1450→          <Card className="border-0 shadow-lg">
+  1451→            <CardContent className="p-6">
+  1452→              <Skeleton className="w-40 h-5 mb-4" />
+  1453→              <Skeleton className="w-full h-[260px] rounded-xl" />
+  1454→            </CardContent>
+  1455→          </Card>
+  1456→        </div>
+  1457→      </main>
+  1458→    </div>
+  1459→  );
+  1460→}
