@@ -1,0 +1,128 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+
+// SMS parsing patterns for Uzbekistan banks
+function detectBank(sms: string): string {
+  const bankKeywords: { bank: string; keywords: string[] }[] = [
+    { bank: "Uzum Bank", keywords: ["uzum", "uzumbank"] },
+    { bank: "Kapitalbank", keywords: ["kapital"] },
+    { bank: "TBC Bank", keywords: ["tbc"] },
+    { bank: "Anorbank", keywords: ["anor"] },
+    { bank: "NBU", keywords: ["nbu", "milliy"] },
+    { bank: "Click", keywords: ["click"] },
+  ];
+
+  const lower = sms.toLowerCase();
+  for (const { bank, keywords } of bankKeywords) {
+    if (keywords.some((k) => lower.includes(k))) {
+      return bank;
+    }
+  }
+  return "Noma'lum";
+}
+
+function extractAmount(sms: string): number | null {
+  // Try multiple patterns
+  const patterns = [
+    /(?:kartaingizga|o'tkazildi|kredit|tushdi|postuplenie|received|hisob|karta)[^\d]*(\d[\d\s,.]*)\s*(?:so'm|UZS)/i,
+    /(\d[\d\s,.]*)\s*(?:so'm|UZS|sum)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = sms.match(pattern);
+    if (match) {
+      const raw = match[1].replace(/[\s,.]/g, "");
+      const num = parseInt(raw, 10);
+      if (!isNaN(num) && num > 0) return num;
+    }
+  }
+  return null;
+}
+
+function extractCardLast4(sms: string): string {
+  const match = sms.match(/(?:karta|card)[^:]*:?\s*\*?(\d{4})/i);
+  return match ? match[1] : "";
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { sms } = body;
+
+    if (!sms || typeof sms !== "string") {
+      return NextResponse.json(
+        { error: "SMS matni talab qilinadi" },
+        { status: 400 }
+      );
+    }
+
+    const amount = extractAmount(sms);
+    if (amount === null) {
+      return NextResponse.json(
+        { error: "SMS'dan pul miqdorini aniqlab bo'lmadi", parsed: false },
+        { status: 422 }
+      );
+    }
+
+    const bankName = detectBank(sms);
+    const cardLast4 = extractCardLast4(sms);
+
+    // Get current settings
+    const settings = await db.settings.findUnique({ where: { id: "default" } });
+    const needsPct = settings?.needsPercent ?? 50;
+    const wantsPct = settings?.wantsPercent ?? 30;
+    const savingsPct = settings?.savingsPercent ?? 20;
+
+    const needsAmount = Math.round((amount * needsPct) / 100);
+    const wantsAmount = Math.round((amount * wantsPct) / 100);
+    const savingsAmount = Math.round((amount * savingsPct) / 100);
+
+    // Generate payment link
+    let paymentLink = "";
+    if (settings?.savingsCardNumber) {
+      const cardNum = settings.savingsCardNumber.replace(/\s/g, "");
+      if (settings.paymentService === "click") {
+        paymentLink = `https://click.uz/pay?card=${cardNum}&amount=${savingsAmount}`;
+      } else {
+        paymentLink = `https://payme.uz/pay?card=${cardNum}&amount=${savingsAmount}`;
+      }
+    }
+
+    // Save transaction
+    const transaction = await db.transaction.create({
+      data: {
+        amount,
+        needsAmount,
+        wantsAmount,
+        savingsAmount,
+        smsText: sms,
+        bankName,
+        cardLast4,
+        paymentLink,
+      },
+    });
+
+    return NextResponse.json({
+      parsed: true,
+      transaction: {
+        id: transaction.id,
+        amount: transaction.amount,
+        needsAmount: transaction.needsAmount,
+        wantsAmount: transaction.wantsAmount,
+        savingsAmount: transaction.savingsAmount,
+        bankName: transaction.bankName,
+        cardLast4: transaction.cardLast4,
+        paymentLink: transaction.paymentLink,
+        createdAt: transaction.createdAt,
+      },
+      breakdown: {
+        needs: { percent: needsPct, amount: needsAmount, label: "Ehtiyojlar" },
+        wants: { percent: wantsPct, amount: wantsAmount, label: "Xohish-istaklar" },
+        savings: { percent: savingsPct, amount: savingsAmount, label: "Tejash" },
+      },
+    });
+  } catch (error) {
+    console.error("SMS parse error:", error);
+    return NextResponse.json({ error: "Server xatosi" }, { status: 500 });
+  }
+}
