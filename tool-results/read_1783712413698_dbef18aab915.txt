@@ -1,0 +1,502 @@
+   501→   501→   501→                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+   502→   502→   502→                        axisLine={false}
+   503→   503→   503→                        tickLine={false}
+   504→   504→   504→                        tickFormatter={(v: number) => {
+   505→   505→   505→                          if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+   506→   506→   506→                          if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+   507→   507→   507→                          return String(v);
+   508→   508→   508→                        }}
+   509→   509→   509→                      />
+   510→   510→   510→                      <Tooltip
+   511→   511→   511→                        formatter={(value: number) => formatMoney(value)}
+   512→   512→   512→                        contentStyle={{
+   513→   513→   513→                          borderRadius: "12px",
+   514→   514→   514→                          border: "1px solid #e5e7eb",
+   515→   515→   515→                          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+   516→   516→   516→                        }}
+   517→   517→   517→                      />
+   518→   518→   518→                      <Bar dataKey="income" fill="#10b981" radius={[6, 6, 0, 0]} name="Tushum" />
+   519→   519→   519→                      <Bar dataKey="savings" fill="#f59e0b" radius={[6, 6, 0, 0]} name="Tejash" />
+   520→   520→   520→                    </BarChart>
+   521→   521→   521→                  </ResponsiveContainer>
+   522→   522→   522→                </CardContent>
+   523→   523→   523→              </Card>
+   524→   524→   524→            </div>
+   525→   525→   525→
+   526→   526→   526→            {/* Weekly Summary + Bank Breakdown */}
+   527→   527→   527→            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+   528→   528→   528→              {/* Weekly Summary */}
+   529→   529→   529→              <Card className="border-0 shadow-lg bg-white">
+   530→   530→   530→                <CardHeader className="pb-3">
+   531→   531→   531→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   532→   532→   532→                    <BarChart3 className="w-4 h-4 text-emerald-600" />
+   533→   533→   533→                    Haftalik hisobot
+   534→   534→   534→                  </CardTitle>
+   535→   535→   535→                </CardHeader>
+   536→   536→   536→                <CardContent className="space-y-3">
+   537→   537→   537→                  <WeeklyRow label="Jami tushum" value={report?.week.totalIncome ?? 0} color="emerald" />
+   538→   538→   538→                  <WeeklyRow label="Ehtiyojlar" value={report?.week.totalNeeds ?? 0} color="amber" />
+   539→   539→   539→                  <WeeklyRow label="Xohish-istaklar" value={report?.week.totalWants ?? 0} color="violet" />
+   540→   540→   540→                  <WeeklyRow label="Tejash" value={report?.week.totalSavings ?? 0} color="green" />
+   541→   541→   541→                  <Separator />
+   542→   542→   542→                  <div className="flex items-center justify-between text-sm text-gray-500">
+   543→   543→   543→                    <span>Operatsiyalar soni</span>
+   544→   544→   544→                    <span className="font-medium text-gray-900">
+   545→   545→   545→                      {report?.week.transactionCount ?? 0} ta
+   546→   546→   546→                    </span>
+   547→   547→   547→                  </div>
+   548→   548→   548→                </CardContent>
+   549→   549→   549→              </Card>
+   550→   550→   550→
+   551→   551→   551→              {/* Bank Breakdown */}
+   552→   552→   552→              <Card className="border-0 shadow-lg bg-white">
+   553→   553→   553→                <CardHeader className="pb-3">
+   554→   554→   554→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   555→   555→   555→                    <Building2 className="w-4 h-4 text-emerald-600" />
+   556→   556→   556→                    Banklar bo&apos;yicha
+   557→   557→   557→                  </CardTitle>
+   558→   558→   558→                </CardHeader>
+   559→   559→   559→                <CardContent>
+   560→   560→   560→                  {report && Object.keys(report.bankStats).length > 0 ? (
+   561→   561→   561→                    <div className="space-y-3">
+   562→   562→   562→                      {Object.entries(report.bankStats)
+   563→   563→   563→                        .sort((a, b) => b[1].total - a[1].total)
+   564→   564→   564→                        .map(([bank, stats]) => (
+   565→   565→   565→                          <div key={bank} className="flex items-center justify-between">
+   566→   566→   566→                            <div className="flex items-center gap-2">
+   567→   567→   567→                              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+   568→   568→   568→                                <Building2 className="w-4 h-4 text-gray-600" />
+   569→   569→   569→                              </div>
+   570→   570→   570→                              <div>
+   571→   571→   571→                                <p className="text-sm font-medium text-gray-900">{bank}</p>
+   572→   572→   572→                                <p className="text-xs text-gray-500">{stats.count} ta operatsiya</p>
+   573→   573→   573→                              </div>
+   574→   574→   574→                            </div>
+   575→   575→   575→                            <span className="text-sm font-semibold text-gray-900">
+   576→   576→   576→                              {formatMoney(stats.total)}
+   577→   577→   577→                            </span>
+   578→   578→   578→                          </div>
+   579→   579→   579→                        ))}
+   580→   580→   580→                    </div>
+   581→   581→   581→                  ) : (
+   582→   582→   582→                    <div className="text-center text-gray-400 text-sm py-8">
+   583→   583→   583→                      Hali ma&apos;lumot yo&apos;q
+   584→   584→   584→                    </div>
+   585→   585→   585→                  )}
+   586→   586→   586→                </CardContent>
+   587→   587→   587→              </Card>
+   588→   588→   588→            </div>
+   589→   589→   589→
+   590→   590→   590→            {/* Telegram Bot Info */}
+   591→   591→   591→            <Card className="border-0 shadow-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+   592→   592→   592→              <CardContent className="py-6">
+   593→   593→   593→                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+   594→   594→   594→                  <div className="flex items-center gap-4">
+   595→   595→   595→                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+   596→   596→   596→                      <Bot className="w-6 h-6" />
+   597→   597→   597→                    </div>
+   598→   598→   598→                    <div>
+   599→   599→   599→                      <h3 className="font-bold text-lg">Telegram Bot Integration</h3>
+   600→   600→   600→                      <p className="text-emerald-100 text-sm mt-0.5">
+   601→   601→   601→                        MacroDroid orqali SMS avtomatik tahlil qilinadi va hisobot yuboriladi
+   602→   602→   602→                      </p>
+   603→   603→   603→                    </div>
+   604→   604→   604→                  </div>
+   605→   605→   605→                  <div className="flex gap-2">
+   606→   606→   606→                    <Badge variant="secondary" className="bg-white/20 text-white border-0">
+   607→   607→   607→                      <ShieldCheck className="w-3 h-3 mr-1" />
+   608→   608→   608→                      Faol
+   609→   609→   609→                    </Badge>
+   610→   610→   610→                    <Badge variant="secondary" className="bg-white/20 text-white border-0">
+   611→   611→   611→                      <Clock className="w-3 h-3 mr-1" />
+   612→   612→   612→                      Har Yakshanba 20:00
+   613→   613→   613→                    </Badge>
+   614→   614→   614→                  </div>
+   615→   615→   615→                </div>
+   616→   616→   616→                <div className="mt-4 p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+   617→   617→   617→                  <p className="text-sm text-emerald-50">
+   618→   618→   618→                    <strong>Ishlash tartibi:</strong> Bank SMS → MacroDroid o&apos;qiydi → Bot API&apos;ga yuboradi → 50/30/20 hisoblaydi → Telegram&apos;ga xabar + Tasdiqlash tugmalari → To&apos;lov havolasi generatsiya qilinadi
+   619→   619→   619→                  </p>
+   620→   620→   620→                </div>
+   621→   621→   621→              </CardContent>
+   622→   622→   622→            </Card>
+   623→   623→   623→          </TabsContent>
+   624→   624→   624→
+   625→   625→   625→          {/* SMS Parser Tab */}
+   626→   626→   626→          <TabsContent value="sms" className="space-y-6">
+   627→   627→   627→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   628→   628→   628→              <Card className="border-0 shadow-lg bg-white">
+   629→   629→   629→                <CardHeader>
+   630→   630→   630→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   631→   631→   631→                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+   632→   632→   632→                    SMS Tahlil qilish
+   633→   633→   633→                  </CardTitle>
+   634→   634→   634→                  <CardDescription>
+   635→   635→   635→                    Bank SMS matnini joylashtiring, bot avtomatik pul miqdorini aniqlaydi va 50/30/20 bo&apos;linadi
+   636→   636→   636→                  </CardDescription>
+   637→   637→   637→                </CardHeader>
+   638→   638→   638→                <CardContent className="space-y-4">
+   639→   639→   639→                  <Textarea
+   640→   640→   640→                    placeholder="Masalan: Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi."
+   641→   641→   641→                    value={smsInput}
+   642→   642→   642→                    onChange={(e) => setSmsInput(e.target.value)}
+   643→   643→   643→                    className="min-h-[120px] resize-none text-sm"
+   644→   644→   644→                  />
+   645→   645→   645→                  <div className="flex gap-2">
+   646→   646→   646→                    <Button
+   647→   647→   647→                      onClick={handleParseSMS}
+   648→   648→   648→                      disabled={parsing || !smsInput.trim()}
+   649→   649→   649→                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+   650→   650→   650→                    >
+   651→   651→   651→                      {parsing ? (
+   652→   652→   652→                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+   653→   653→   653→                      ) : (
+   654→   654→   654→                        <Send className="w-4 h-4 mr-2" />
+   655→   655→   655→                      )}
+   656→   656→   656→                      Tahlil qilish
+   657→   657→   657→                    </Button>
+   658→   658→   658→                  </div>
+   659→   659→   659→
+   660→   660→   660→                  {/* Sample SMS buttons */}
+   661→   661→   661→                  <div>
+   662→   662→   662→                    <p className="text-xs text-gray-500 mb-2">Namuna SMS:</p>
+   663→   663→   663→                    <div className="flex flex-wrap gap-2">
+   664→   664→   664→                      {[
+   665→   665→   665→                        "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
+   666→   666→   666→                        "Kapitalbank: Kartangizga 1,250,000 so'm tushdi. Karta ****4567. Balans: 3,200,000 so'm.",
+   667→   667→   667→                        "TBC Bank: Hisobingizga 320,000 so'm o'tkazildi. Karta ****8901.",
+   668→   668→   668→                      ].map((sms, i) => (
+   669→   669→   669→                        <button
+   670→   670→   670→                          key={i}
+   671→   671→   671→                          onClick={() => setSmsInput(sms)}
+   672→   672→   672→                          className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-gray-600 max-w-full truncate"
+   673→   673→   673→                        >
+   674→   674→   674→                          Namuna {i + 1}
+   675→   675→   675→                        </button>
+   676→   676→   676→                      ))}
+   677→   677→   677→                    </div>
+   678→   678→   678→                  </div>
+   679→   679→   679→                </CardContent>
+   680→   680→   680→              </Card>
+   681→   681→   681→
+   682→   682→   682→              {/* Parsed Result */}
+   683→   683→   683→              <Card className="border-0 shadow-lg bg-white">
+   684→   684→   684→                <CardHeader>
+   685→   685→   685→                  <CardTitle className="text-base font-semibold">Natija</CardTitle>
+   686→   686→   686→                </CardHeader>
+   687→   687→   687→                <CardContent>
+   688→   688→   688→                  {parsedResult ? (
+   689→   689→   689→                    parsedResult.parsed ? (
+   690→   690→   690→                      <motion.div
+   691→   691→   691→                        initial={{ opacity: 0, y: 10 }}
+   692→   692→   692→                        animate={{ opacity: 1, y: 0 }}
+   693→   693→   693→                        className="space-y-4"
+   694→   694→   694→                      >
+   695→   695→   695→                        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+   696→   696→   696→                          <div className="flex items-center gap-2 mb-3">
+   697→   697→   697→                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+   698→   698→   698→                            <span className="font-semibold text-emerald-800">
+   699→   699→   699→                              {formatMoney(parsedResult.transaction.amount)} tushdi
+   700→   700→   700→                            </span>
+   701→   701→   701→                          </div>
+   702→   702→   702→                          <p className="text-sm text-emerald-700">
+   703→   703→   703→                            Bank: {parsedResult.transaction.bankName}
+   704→   704→   704→                            {parsedResult.transaction.cardLast4 && (
+   705→   705→   705→                              <span className="ml-2">
+   706→   706→   706→                                Karta: ****{parsedResult.transaction.cardLast4}
+   707→   707→   707→                              </span>
+   708→   708→   708→                            )}
+   709→   709→   709→                          </p>
+   710→   710→   710→                        </div>
+   711→   711→   711→
+   712→   712→   712→                        <div className="space-y-2">
+   713→   713→   713→                          <h4 className="text-sm font-medium text-gray-700">Hisob-kitob:</h4>
+   714→   714→   714→                          <BreakdownRow
+   715→   715→   715→                            label="Ehtiyojlar"
+   716→   716→   716→                            pct={parsedResult.breakdown.needs.percent}
+   717→   717→   717→                            amount={parsedResult.breakdown.needs.amount}
+   718→   718→   718→                            color={NEEDS_COLOR}
+   719→   719→   719→                          />
+   720→   720→   720→                          <BreakdownRow
+   721→   721→   721→                            label="Xohish-istaklar"
+   722→   722→   722→                            pct={parsedResult.breakdown.wants.percent}
+   723→   723→   723→                            amount={parsedResult.breakdown.wants.amount}
+   724→   724→   724→                            color={WANTS_COLOR}
+   725→   725→   725→                          />
+   726→   726→   726→                          <BreakdownRow
+   727→   727→   727→                            label="Tejash"
+   728→   728→   728→                            pct={parsedResult.breakdown.savings.percent}
+   729→   729→   729→                            amount={parsedResult.breakdown.savings.amount}
+   730→   730→   730→                            color={SAVINGS_COLOR}
+   731→   731→   731→                          />
+   732→   732→   732→                        </div>
+   733→   733→   733→
+   734→   734→   734→                        {parsedResult.transaction.paymentLink && (
+   735→   735→   735→                          <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
+   736→   736→   736→                            <p className="text-xs text-gray-500 mb-2">To&apos;lov havolasi:</p>
+   737→   737→   737→                            <div className="flex items-center gap-2">
+   738→   738→   738→                              <code className="text-xs flex-1 text-emerald-700 bg-white p-2 rounded-lg border truncate">
+   739→   739→   739→                                {parsedResult.transaction.paymentLink}
+   740→   740→   740→                              </code>
+   741→   741→   741→                              <Button
+   742→   742→   742→                                size="sm"
+   743→   743→   743→                                variant="outline"
+   744→   744→   744→                                onClick={() =>
+   745→   745→   745→                                  handleCopyLink(parsedResult.transaction.paymentLink)
+   746→   746→   746→                                }
+   747→   747→   747→                              >
+   748→   748→   748→                                <Copy className="w-3.5 h-3.5" />
+   749→   749→   749→                              </Button>
+   750→   750→   750→                            </div>
+   751→   751→   751→                          </div>
+   752→   752→   752→                        )}
+   753→   753→   753→                      </motion.div>
+   754→   754→   754→                    ) : (
+   755→   755→   755→                      <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+   756→   756→   756→                        <div className="flex items-center gap-2">
+   757→   757→   757→                          <XCircle className="w-5 h-5 text-red-500" />
+   758→   758→   758→                          <span className="text-red-700">{parsedResult.error}</span>
+   759→   759→   759→                        </div>
+   760→   760→   760→                      </div>
+   761→   761→   761→                    )
+   762→   762→   762→                  ) : (
+   763→   763→   763→                    <div className="text-center py-12 text-gray-400">
+   764→   764→   764→                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   765→   765→   765→                      <p className="text-sm">SMS matnini kiriting va &quot;Tahlil qilish&quot; tugmasini bosing</p>
+   766→   766→   766→                    </div>
+   767→   767→   767→                  )}
+   768→   768→   768→                </CardContent>
+   769→   769→   769→              </Card>
+   770→   770→   770→            </div>
+   771→   771→   771→          </TabsContent>
+   772→   772→   772→
+   773→   773→   773→          {/* Transactions Tab */}
+   774→   774→   774→          <TabsContent value="transactions" className="space-y-4">
+   775→   775→   775→            <div className="flex items-center justify-between">
+   776→   776→   776→              <div>
+   777→   777→   777→                <h2 className="text-lg font-bold text-gray-900">Operatsiyalar tarixi</h2>
+   778→   778→   778→                <p className="text-sm text-gray-500">
+   779→   779→   779→                  Jami {transactions.length} ta operatsiya
+   780→   780→   780→                </p>
+   781→   781→   781→              </div>
+   782→   782→   782→              <Button
+   783→   783→   783→                variant="outline"
+   784→   784→   784→                size="sm"
+   785→   785→   785→                onClick={fetchData}
+   786→   786→   786→              >
+   787→   787→   787→                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+   788→   788→   788→                Yangilash
+   789→   789→   789→              </Button>
+   790→   790→   790→            </div>
+   791→   791→   791→
+   792→   792→   792→            {transactions.length > 0 ? (
+   793→   793→   793→              <div className="space-y-3">
+   794→   794→   794→                <AnimatePresence>
+   795→   795→   795→                  {transactions.map((tx) => (
+   796→   796→   796→                    <motion.div
+   797→   797→   797→                      key={tx.id}
+   798→   798→   798→                      initial={{ opacity: 0, y: 10 }}
+   799→   799→   799→                      animate={{ opacity: 1, y: 0 }}
+   800→   800→   800→                      exit={{ opacity: 0, y: -10 }}
+   801→   801→   801→                    >
+   802→   802→   802→                      <TransactionCard
+   803→   803→   803→                        tx={tx}
+   804→   804→   804→                        onConfirm={() => setConfirmTx(tx)}
+   805→   805→   805→                        onCopyLink={() => handleCopyLink(tx.paymentLink)}
+   806→   806→   806→                        onDelete={() => handleDeleteTx(tx.id)}
+   807→   807→   807→                      />
+   808→   808→   808→                    </motion.div>
+   809→   809→   809→                  ))}
+   810→   810→   810→                </AnimatePresence>
+   811→   811→   811→              </div>
+   812→   812→   812→            ) : (
+   813→   813→   813→              <Card className="border-0 shadow-lg bg-white">
+   814→   814→   814→                <CardContent className="py-16 text-center text-gray-400">
+   815→   815→   815→                  <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   816→   816→   816→                  <p className="text-sm">Hali operatsiya yo&apos;q</p>
+   817→   817→   817→                  <p className="text-xs mt-1">
+   818→   818→   818→                    SMS tahlil qiling yoki &quot;Qo&apos;shish&quot; tugmasini bosing
+   819→   819→   819→                  </p>
+   820→   820→   820→                </CardContent>
+   821→   821→   821→              </Card>
+   822→   822→   822→            )}
+   823→   823→   823→          </TabsContent>
+   824→   824→   824→
+   825→   825→   825→          {/* Settings Tab */}
+   826→   826→   826→          <TabsContent value="settings" className="space-y-6">
+   827→   827→   827→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   828→   828→   828→              {/* Budget Settings */}
+   829→   829→   829→              <Card className="border-0 shadow-lg bg-white">
+   830→   830→   830→                <CardHeader>
+   831→   831→   831→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   832→   832→   832→                    <Settings2 className="w-4 h-4 text-emerald-600" />
+   833→   833→   833→                    Byudjet foizlari
+   834→   834→   834→                  </CardTitle>
+   835→   835→   835→                  <CardDescription>
+   836→   836→   836→                    50/30/20 qoidasini o&apos;zgartiring. Foizlar yig&apos;indisi 100 bo&apos;lishi kerak.
+   837→   837→   837→                  </CardDescription>
+   838→   838→   838→                </CardHeader>
+   839→   839→   839→                <CardContent className="space-y-6">
+   840→   840→   840→                  {/* Needs */}
+   841→   841→   841→                  <div className="space-y-2">
+   842→   842→   842→                    <div className="flex items-center justify-between">
+   843→   843→   843→                      <Label className="flex items-center gap-2">
+   844→   844→   844→                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: NEEDS_COLOR }} />
+   845→   845→   845→                        Ehtiyojlar
+   846→   846→   846→                      </Label>
+   847→   847→   847→                      <span className="text-sm font-bold" style={{ color: NEEDS_COLOR }}>
+   848→   848→   848→                        {editSettings.needsPercent}%
+   849→   849→   849→                      </span>
+   850→   850→   850→                    </div>
+   851→   851→   851→                    <Slider
+   852→   852→   852→                      value={[editSettings.needsPercent]}
+   853→   853→   853→                      onValueChange={([v]) =>
+   854→   854→   854→                        setEditSettings((p) => ({
+   855→   855→   855→                          ...p,
+   856→   856→   856→                          needsPercent: v,
+   857→   857→   857→                          savingsPercent: 100 - v - p.wantsPercent,
+   858→   858→   858→                        }))
+   859→   859→   859→                      }
+   860→   860→   860→                      max={100}
+   861→   861→   861→                      min={0}
+   862→   862→   862→                      step={1}
+   863→   863→   863→                      className="[&_[role=slider]]:bg-amber-500"
+   864→   864→   864→                    />
+   865→   865→   865→                  </div>
+   866→   866→   866→
+   867→   867→   867→                  {/* Wants */}
+   868→   868→   868→                  <div className="space-y-2">
+   869→   869→   869→                    <div className="flex items-center justify-between">
+   870→   870→   870→                      <Label className="flex items-center gap-2">
+   871→   871→   871→                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: WANTS_COLOR }} />
+   872→   872→   872→                        Xohish-istaklar
+   873→   873→   873→                      </Label>
+   874→   874→   874→                      <span className="text-sm font-bold" style={{ color: WANTS_COLOR }}>
+   875→   875→   875→                        {editSettings.wantsPercent}%
+   876→   876→   876→                      </span>
+   877→   877→   877→                    </div>
+   878→   878→   878→                    <Slider
+   879→   879→   879→                      value={[editSettings.wantsPercent]}
+   880→   880→   880→                      onValueChange={([v]) =>
+   881→   881→   881→                        setEditSettings((p) => ({
+   882→   882→   882→                          ...p,
+   883→   883→   883→                          wantsPercent: v,
+   884→   884→   884→                          savingsPercent: 100 - p.needsPercent - v,
+   885→   885→   885→                        }))
+   886→   886→   886→                      }
+   887→   887→   887→                      max={100}
+   888→   888→   888→                      min={0}
+   889→   889→   889→                      step={1}
+   890→   890→   890→                      className="[&_[role=slider]]:bg-violet-500"
+   891→   891→   891→                    />
+   892→   892→   892→                  </div>
+   893→   893→   893→
+   894→   894→   894→                  {/* Savings */}
+   895→   895→   895→                  <div className="space-y-2">
+   896→   896→   896→                    <div className="flex items-center justify-between">
+   897→   897→   897→                      <Label className="flex items-center gap-2">
+   898→   898→   898→                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: SAVINGS_COLOR }} />
+   899→   899→   899→                        Tejash
+   900→   900→   900→                      </Label>
+   901→   901→   901→                      <span className="text-sm font-bold" style={{ color: SAVINGS_COLOR }}>
+   902→   902→   902→                        {editSettings.savingsPercent}%
+   903→   903→   903→                      </span>
+   904→   904→   904→                    </div>
+   905→   905→   905→                    <Slider
+   906→   906→   906→                      value={[editSettings.savingsPercent]}
+   907→   907→   907→                      onValueChange={([v]) =>
+   908→   908→   908→                        setEditSettings((p) => ({
+   909→   909→   909→                          ...p,
+   910→   910→   910→                          savingsPercent: v,
+   911→   911→   911→                          wantsPercent: 100 - p.needsPercent - v,
+   912→   912→   912→                        }))
+   913→   913→   913→                      }
+   914→   914→   914→                      max={100}
+   915→   915→   915→                      min={0}
+   916→   916→   916→                      step={1}
+   917→   917→   917→                      className="[&_[role=slider]]:bg-emerald-500"
+   918→   918→   918→                    />
+   919→   919→   919→                  </div>
+   920→   920→   920→
+   921→   921→   921→                  {/* Percentage bar */}
+   922→   922→   922→                  <div className="h-3 rounded-full overflow-hidden flex bg-gray-100">
+   923→   923→   923→                    <div
+   924→   924→   924→                      className="h-full transition-all duration-300"
+   925→   925→   925→                      style={{
+   926→   926→   926→                        width: `${editSettings.needsPercent}%`,
+   927→   927→   927→                        backgroundColor: NEEDS_COLOR,
+   928→   928→   928→                      }}
+   929→   929→   929→                    />
+   930→   930→   930→                    <div
+   931→   931→   931→                      className="h-full transition-all duration-300"
+   932→   932→   932→                      style={{
+   933→   933→   933→                        width: `${editSettings.wantsPercent}%`,
+   934→   934→   934→                        backgroundColor: WANTS_COLOR,
+   935→   935→   935→                      }}
+   936→   936→   936→                    />
+   937→   937→   937→                    <div
+   938→   938→   938→                      className="h-full transition-all duration-300"
+   939→   939→   939→                      style={{
+   940→   940→   940→                        width: `${editSettings.savingsPercent}%`,
+   941→   941→   941→                        backgroundColor: SAVINGS_COLOR,
+   942→   942→   942→                      }}
+   943→   943→   943→                    />
+   944→   944→   944→                  </div>
+   945→   945→   945→
+   946→   946→   946→                  <div className="flex items-center justify-between text-xs text-gray-500">
+   947→   947→   947→                    <span>
+   948→   948→   948→                      Jami: {editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent}%
+   949→   949→   949→                    </span>
+   950→   950→   950→                    {editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent !== 100 && (
+   951→   951→   951→                      <span className="text-red-500 font-medium">
+   952→   952→   952→                        Foizlar 100 bo&apos;lishi kerak!
+   953→   953→   953→                      </span>
+   954→   954→   954→                    )}
+   955→   955→   955→                  </div>
+   956→   956→   956→
+   957→   957→   957→                  <Button
+   958→   958→   958→                    onClick={handleSaveSettings}
+   959→   959→   959→                    disabled={
+   960→   960→   960→                      savingSettings ||
+   961→   961→   961→                      editSettings.needsPercent +
+   962→   962→   962→                        editSettings.wantsPercent +
+   963→   963→   963→                        editSettings.savingsPercent !==
+   964→   964→   964→                        100
+   965→   965→   965→                    }
+   966→   966→   966→                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+   967→   967→   967→                  >
+   968→   968→   968→                    {savingSettings ? (
+   969→   969→   969→                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+   970→   970→   970→                    ) : null}
+   971→   971→   971→                    Saqlash
+   972→   972→   972→                  </Button>
+   973→   973→   973→                </CardContent>
+   974→   974→   974→              </Card>
+   975→   975→   975→
+   976→   976→   976→              {/* Payment Settings */}
+   977→   977→   977→              <Card className="border-0 shadow-lg bg-white">
+   978→   978→   978→                <CardHeader>
+   979→   979→   979→                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+   980→   980→   980→                    <Send className="w-4 h-4 text-emerald-600" />
+   981→   981→   981→                    To&apos;lov sozlamalari
+   982→   982→   982→                  </CardTitle>
+   983→   983→   983→                  <CardDescription>
+   984→   984→   984→                    Tejash kartasi ma&apos;lumotlarini kiriting, to&apos;lov havolasi avtomatik generatsiya bo&apos;lsin
+   985→   985→   985→                  </CardDescription>
+   986→   986→   986→                </CardHeader>
+   987→   987→   987→                <CardContent className="space-y-4">
+   988→   988→   988→                  <div className="space-y-2">
+   989→   989→   989→                    <Label>Tejash karta raqami</Label>
+   990→   990→   990→                    <Input
+   991→   991→   991→                      placeholder="8600 1234 5678 9012"
+   992→   992→   992→                      value={editSettings.savingsCardNumber}
+   993→   993→   993→                      onChange={(e) =>
+   994→   994→   994→                        setEditSettings((p) => ({
+   995→   995→   995→                          ...p,
+   996→   996→   996→                          savingsCardNumber: e.target.value,
+   997→   997→   997→                        }))
+   998→   998→   998→                      }
+   999→   999→   999→                      className="text-sm"
+  1000→  1000→  1000→                    />
+
+[showing lines 501-1000 of 1460; use offset=1001 with limit to continue reading]
