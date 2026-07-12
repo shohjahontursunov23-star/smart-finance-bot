@@ -1,0 +1,12 @@
+{
+  "name": "telegram-bot-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "socket.io": "^4.8.0"
+  }
+}

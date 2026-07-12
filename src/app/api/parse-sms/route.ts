@@ -10,24 +10,30 @@ function detectBank(sms: string): string {
     { bank: "Anorbank", keywords: ["anor"] },
     { bank: "NBU", keywords: ["nbu", "milliy"] },
     { bank: "Click", keywords: ["click"] },
+    { bank: "Ipoteka Bank", keywords: ["ipoteka"] },
+    { bank: "Turon Bank", keywords: ["turon"] },
+    { bank: "Infinbank", keywords: ["infin"] },
+    { bank: "Soliq Bank", keywords: ["soliq"] },
+    { bank: "Xalq Bank", keywords: ["xalq"] },
+    { bank: "SQB", keywords: ["sqb", "savdogar"] },
+    { bank: "Aloqa Bank", keywords: ["aloqa"] },
+    { bank: "Trustbank", keywords: ["trust"] },
+    { bank: "Hamkorbank", keywords: ["hamkor"] },
+    { bank: "Davrbank", keywords: ["davr"] },
+    { bank: "Mo'javodor", keywords: ["mojavodor"] },
   ];
-
   const lower = sms.toLowerCase();
   for (const { bank, keywords } of bankKeywords) {
-    if (keywords.some((k) => lower.includes(k))) {
-      return bank;
-    }
+    if (keywords.some((k) => lower.includes(k))) return bank;
   }
   return "Noma'lum";
 }
 
 function extractAmount(sms: string): number | null {
-  // Try multiple patterns
   const patterns = [
     /(?:kartaingizga|o'tkazildi|kredit|tushdi|postuplenie|received|hisob|karta)[^\d]*(\d[\d\s,.]*)\s*(?:so'm|UZS)/i,
     /(\d[\d\s,.]*)\s*(?:so'm|UZS|sum)/i,
   ];
-
   for (const pattern of patterns) {
     const match = sms.match(pattern);
     if (match) {
@@ -47,28 +53,28 @@ function extractCardLast4(sms: string): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { sms } = body;
+    const { sms, apiKey: providedKey } = body;
 
     if (!sms || typeof sms !== "string") {
-      return NextResponse.json(
-        { error: "SMS matni talab qilinadi" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "SMS matni talab qilinadi" }, { status: 400 });
+    }
+
+    // Check API key if set in settings
+    const settings = await db.settings.findUnique({ where: { id: "default" } });
+    if (settings?.apiKey && settings.apiKey.length > 10) {
+      if (providedKey !== settings.apiKey) {
+        return NextResponse.json({ error: "API kalit noto'g'ri" }, { status: 401 });
+      }
     }
 
     const amount = extractAmount(sms);
     if (amount === null) {
-      return NextResponse.json(
-        { error: "SMS'dan pul miqdorini aniqlab bo'lmadi", parsed: false },
-        { status: 422 }
-      );
+      return NextResponse.json({ error: "SMS'dan pul miqdorini aniqlab bo'lmadi", parsed: false }, { status: 422 });
     }
 
     const bankName = detectBank(sms);
     const cardLast4 = extractCardLast4(sms);
 
-    // Get current settings
-    const settings = await db.settings.findUnique({ where: { id: "default" } });
     const needsPct = settings?.needsPercent ?? 50;
     const wantsPct = settings?.wantsPercent ?? 30;
     const savingsPct = settings?.savingsPercent ?? 20;
@@ -77,7 +83,6 @@ export async function POST(request: Request) {
     const wantsAmount = Math.round((amount * wantsPct) / 100);
     const savingsAmount = Math.round((amount * savingsPct) / 100);
 
-    // Generate payment link
     let paymentLink = "";
     if (settings?.savingsCardNumber) {
       const cardNum = settings.savingsCardNumber.replace(/\s/g, "");
@@ -88,31 +93,31 @@ export async function POST(request: Request) {
       }
     }
 
-    // Save transaction
     const transaction = await db.transaction.create({
       data: {
-        amount,
-        needsAmount,
-        wantsAmount,
-        savingsAmount,
-        smsText: sms,
-        bankName,
-        cardLast4,
-        paymentLink,
+        amount, needsAmount, wantsAmount, savingsAmount,
+        smsText: sms, bankName, cardLast4, paymentLink,
       },
     });
+
+    // Notify Telegram bot mini-service if running
+    try {
+      await fetch(`http://localhost:3003/notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction, breakdown: { needs: { percent: needsPct, amount: needsAmount }, wants: { percent: wantsPct, amount: wantsAmount }, savings: { percent: savingsPct, amount: savingsAmount } } }),
+      });
+    } catch {
+      // Bot service may not be running — non-fatal
+    }
 
     return NextResponse.json({
       parsed: true,
       transaction: {
-        id: transaction.id,
-        amount: transaction.amount,
-        needsAmount: transaction.needsAmount,
-        wantsAmount: transaction.wantsAmount,
-        savingsAmount: transaction.savingsAmount,
-        bankName: transaction.bankName,
-        cardLast4: transaction.cardLast4,
-        paymentLink: transaction.paymentLink,
+        id: transaction.id, amount: transaction.amount,
+        needsAmount: transaction.needsAmount, wantsAmount: transaction.wantsAmount,
+        savingsAmount: transaction.savingsAmount, bankName: transaction.bankName,
+        cardLast4: transaction.cardLast4, paymentLink: transaction.paymentLink,
         createdAt: transaction.createdAt,
       },
       breakdown: {

@@ -19,6 +19,7 @@ model Settings {
   reportDayOfWeek     Int      @default(7)
   reportHour          Int      @default(20)
   paymentService      String   @default("payme")
+  apiKey              String   @default("")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,30 +17,19 @@ export const metadata: Metadata = {
   title: "Smart Finance Bot — Moliyaviy Avtomatlashtirish",
   description:
     "Shaxsiy moliyaviy avtomatlashtirish tizimi. 50/30/20 qoidasi bo'yicha byudjet taqsimoti, SMS tahlil, va Telegram bot integratsiyasi.",
-  keywords: [
-    "Smart Finance",
-    "Moliya",
-    "Budget",
-    "50/30/20",
-    "Telegram Bot",
-    "O'zbekiston",
-  ],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
+  keywords: ["Smart Finance", "Moliya", "Budget", "50/30/20", "Telegram Bot", "O'zbekiston"],
+  icons: { icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg" },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="uz" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
