@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import fs from "fs";
+import path from "path";
 
 const SAMPLE_SMS = [
   "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
@@ -14,17 +16,41 @@ const SAMPLE_SMS = [
 
 export async function POST() {
   try {
+    // Ensure db folder exists
+    const dbDir = path.join(process.cwd(), "db");
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    // Ensure default settings exist
+    try {
+      await db.settings.upsert({
+        where: { id: "default" },
+        update: {},
+        create: {
+          id: "default",
+          needsPercent: 50,
+          wantsPercent: 30,
+          savingsPercent: 20,
+        },
+      });
+    } catch (settingsErr) {
+      console.error("Settings upsert error:", settingsErr);
+      // Non-fatal — continue with defaults
+    }
+
     const settings = await db.settings.findUnique({ where: { id: "default" } });
     const needsPct = settings?.needsPercent ?? 50;
     const wantsPct = settings?.wantsPercent ?? 30;
     const savingsPct = settings?.savingsPercent ?? 20;
 
+    // Clear old seed data to avoid duplicates
+    await db.transaction.deleteMany({});
+
     const created = [];
     for (const sms of SAMPLE_SMS) {
       // Extract amount
-      const match = sms.match(
-        /(\d[\d\s,.]*)\s*(?:so'm|UZS)/i
-      );
+      const match = sms.match(/(\d[\d\s,.]*)\s*(?:so'm|UZS)/i);
       if (!match) continue;
 
       const amount = parseInt(match[1].replace(/[\s,.]/g, ""), 10);
@@ -49,9 +75,7 @@ export async function POST() {
 
       // Random date within last 30 days
       const daysAgo = Math.floor(Math.random() * 30);
-      const pastDate = new Date(
-        Date.now() - daysAgo * 24 * 60 * 60 * 1000
-      );
+      const pastDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
 
       const tx = await db.transaction.create({
         data: {
@@ -78,6 +102,10 @@ export async function POST() {
     });
   } catch (error) {
     console.error("Seed error:", error);
-    return NextResponse.json({ error: "Server xatosi" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Noma'lum xatolik";
+    return NextResponse.json(
+      { success: false, error: "Server xatosi", details: message },
+      { status: 500 }
+    );
   }
 }

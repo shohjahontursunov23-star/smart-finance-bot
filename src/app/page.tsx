@@ -303,9 +303,11 @@ export default function SmartFinanceDashboard() {
       if (data.success) {
         toast.success(data.message);
         fetchData();
+      } else {
+        toast.error(data.details || data.error || "Xatolik yuz berdi");
       }
-    } catch {
-      toast.error("Xatolik");
+    } catch (err) {
+      toast.error("Tarmoq xatosi — server bilan aloqa yo'q");
     }
   };
 
