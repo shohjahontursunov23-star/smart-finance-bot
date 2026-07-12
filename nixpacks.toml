@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ['...', 'python311', 'gcc', 'stdenv.cc']
+
+[phases.install]
+cmds = ['npm install']
+
+[phases.build]
+cmds = ['npx prisma generate', 'npm run build']
+
+[phases.start]
+cmds = ['node .next/standalone/server.js']

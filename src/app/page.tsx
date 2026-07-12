@@ -36,6 +36,18 @@ import {
   DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Toaster, toast } from "sonner";
+import { CalendarDays, Printer, Megaphone } from "lucide-react";
+
+// ============================================================
+// Animation Variants
+// ============================================================
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4, ease: "easeOut" } }),
+};
+const scaleIn = { hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: "easeOut" } } };
+const slideInLeft = { hidden: { opacity: 0, x: -20 }, visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } } };
+const slideInRight = { hidden: { opacity: 0, x: 20 }, visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } } };
 
 // ============================================================
 // Types
@@ -117,6 +129,10 @@ export default function SmartFinanceDashboard() {
 
   // Confirm dialog
   const [confirmTx, setConfirmTx] = useState<Transaction | null>(null);
+
+  // Weekly report
+  const [sendingReport, setSendingReport] = useState(false);
+  const [weeklyPreview, setWeeklyPreview] = useState<any>(null);
 
   // Socket.io
   const socketRef = useRef<any>(null);
@@ -289,6 +305,32 @@ export default function SmartFinanceDashboard() {
   const handleCopyLink = (link: string) => { navigator.clipboard.writeText(link); toast.success("Nusxalandi!"); };
   const handleCopy = (text: string) => { navigator.clipboard.writeText(text); toast.success("Nusxalandi!"); };
 
+  const handlePrintPDF = () => {
+    window.open("/api/export/pdf", "_blank");
+    setTimeout(() => { try { /* trigger print after load */ } catch { /* ignore */ } }, 1000);
+  };
+
+  const handleSendWeeklyReport = async () => {
+    setSendingReport(true);
+    try {
+      const res = await fetch("/api/weekly-report", { method: "POST" });
+      const data = await res.json();
+      if (data.success) toast.success(data.message);
+      else toast.error(data.error || "Xatolik");
+    } catch { toast.error("Xatolik"); }
+    finally { setSendingReport(false); }
+  };
+
+  // Fetch weekly report preview
+  const fetchWeeklyPreview = useCallback(async () => {
+    try {
+      const res = await fetch("/api/weekly-report");
+      const data = await res.json();
+      setWeeklyPreview(data);
+    } catch { /* non-fatal */ }
+  }, []);
+  useEffect(() => { fetchWeeklyPreview(); }, [fetchWeeklyPreview]);
+
   if (loading || !mounted) return <DashboardSkeleton />;
 
   const pieData = report
@@ -350,13 +392,20 @@ export default function SmartFinanceDashboard() {
           {/* ====== Dashboard Tab ====== */}
           <TabsContent value="dashboard" className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard title="Oylik tushum" value={formatMoney(report?.month.totalIncome ?? 0)} icon={<TrendingUp className="w-5 h-5" />} color="emerald" subtitle={`${report?.month.transactionCount ?? 0} ta operatsiya`} />
-              <StatCard title="Ehtiyojlar" value={formatMoney(report?.month.totalNeeds ?? 0)} icon={<ShoppingCart className="w-5 h-5" />} color="amber" subtitle={`${settings?.needsPercent ?? 50}%`} />
-              <StatCard title="Xohish-istaklar" value={formatMoney(report?.month.totalWants ?? 0)} icon={<Wallet className="w-5 h-5" />} color="violet" subtitle={`${settings?.wantsPercent ?? 30}%`} />
-              <StatCard title="Tejash" value={formatMoney(report?.month.totalSavings ?? 0)} icon={<PiggyBank className="w-5 h-5" />} color="green" subtitle={`O'tkazilgan: ${formatMoney(report?.month.transferredSavings ?? 0)}`} />
+              {[
+                { title: "Oylik tushum", value: report?.month.totalIncome ?? 0, icon: <TrendingUp className="w-5 h-5" />, color: "emerald" as const, subtitle: `${report?.month.transactionCount ?? 0} ta operatsiya` },
+                { title: "Ehtiyojlar", value: report?.month.totalNeeds ?? 0, icon: <ShoppingCart className="w-5 h-5" />, color: "amber" as const, subtitle: `${settings?.needsPercent ?? 50}%` },
+                { title: "Xohish-istaklar", value: report?.month.totalWants ?? 0, icon: <Wallet className="w-5 h-5" />, color: "violet" as const, subtitle: `${settings?.wantsPercent ?? 30}%` },
+                { title: "Tejash", value: report?.month.totalSavings ?? 0, icon: <PiggyBank className="w-5 h-5" />, color: "green" as const, subtitle: `O'tkazilgan: ${formatMoney(report?.month.transferredSavings ?? 0)}` },
+              ].map((s, i) => (
+                <motion.div key={s.title} custom={i} variants={fadeInUp} initial="hidden" animate="visible">
+                  <StatCard title={s.title} value={formatMoney(s.value)} icon={s.icon} color={s.color} subtitle={s.subtitle} />
+                </motion.div>
+              ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              <motion.div variants={slideInLeft} initial="hidden" animate="visible" transition={{ delay: 0.3 }}>
               <Card className="lg:col-span-2 border-0 shadow-lg bg-white dark:bg-gray-800">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">50/30/20 Qoidasi</CardTitle>
@@ -386,7 +435,9 @@ export default function SmartFinanceDashboard() {
                   </div>
                 </CardContent>
               </Card>
+              </motion.div>
 
+              <motion.div variants={slideInRight} initial="hidden" animate="visible" transition={{ delay: 0.4 }}>
               <Card className="lg:col-span-3 border-0 shadow-lg bg-white dark:bg-gray-800">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">Kunlik tushumlar</CardTitle>
@@ -406,8 +457,10 @@ export default function SmartFinanceDashboard() {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
+              </motion.div>
             </div>
 
+            <motion.div variants={scaleIn} initial="hidden" animate="visible" transition={{ delay: 0.5 }}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
                 <CardHeader className="pb-3">
@@ -456,8 +509,10 @@ export default function SmartFinanceDashboard() {
                 </CardContent>
               </Card>
             </div>
+            </motion.div>
 
             {/* Bot Status Card */}
+            <motion.div variants={fadeInUp} custom={6} initial="hidden" animate="visible">
             <Card className="border-0 shadow-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
               <CardContent className="py-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -489,6 +544,7 @@ export default function SmartFinanceDashboard() {
                 </div>
               </CardContent>
             </Card>
+            </motion.div>
           </TabsContent>
 
           {/* ====== SMS Tab ====== */}
@@ -808,6 +864,46 @@ export default function SmartFinanceDashboard() {
                 </CardContent>
               </Card>
 
+              {/* Weekly Report */}
+              <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+                      <CalendarDays className="w-4 h-4 text-emerald-600" /> Haftalik hisobot
+                    </CardTitle>
+                    {weeklyPreview?.canSend ? (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">Tayyor</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-gray-100 text-gray-500 border-gray-200 text-[10px] dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">Sozlash kerak</Badge>
+                    )}
+                  </div>
+                  <CardDescription className="dark:text-gray-400">Haftalik hisobotni Telegram&apos;ga yuborish</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {weeklyPreview?.preview && (
+                    <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Tushum:</span><span className="font-medium text-gray-900 dark:text-white">{formatMoney(weeklyPreview.preview.totalIncome)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Tejash:</span><span className="font-medium text-emerald-600">{formatMoney(weeklyPreview.preview.totalSavings)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Operatsiyalar:</span><span className="font-medium text-gray-900 dark:text-white">{weeklyPreview.preview.transactionCount} ta</span></div>
+                    </div>
+                  )}
+                  {!weeklyPreview?.canSend && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-2">
+                      Hisobot yuborish uchun Telegram Bot token va Chat ID kiriting.
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button onClick={handleSendWeeklyReport} disabled={sendingReport || !weeklyPreview?.canSend} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
+                      {sendingReport ? <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Megaphone className="w-3.5 h-3.5 mr-1.5" />}
+                      Hisobot yuborish
+                    </Button>
+                    <Button onClick={fetchWeeklyPreview} variant="outline" size="sm" className="text-xs">
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Export & Deploy */}
               <Card className="lg:col-span-2 border-0 shadow-lg bg-white dark:bg-gray-800">
                 <CardHeader>
@@ -817,19 +913,19 @@ export default function SmartFinanceDashboard() {
                   <CardDescription className="dark:text-gray-400">Ma&apos;lumotlarni export qilish va serverga joylashtirish</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <Button variant="outline" onClick={() => window.open("/api/export/excel", "_blank")} className="h-auto py-4 flex-col gap-2">
                       <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
                       <div className="text-left">
-                        <p className="font-medium text-sm text-gray-900 dark:text-white">Excel Export</p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Tranzaksiyalar + Hisobot</p>
+                        <p className="font-medium text-sm text-gray-900 dark:text-white">Excel</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">.xlsx fayl</p>
                       </div>
                     </Button>
-                    <Button variant="outline" onClick={() => window.open("/api/export/pdf", "_blank")} className="h-auto py-4 flex-col gap-2">
-                      <FileDown className="w-6 h-6 text-violet-600" />
+                    <Button variant="outline" onClick={handlePrintPDF} className="h-auto py-4 flex-col gap-2">
+                      <Printer className="w-6 h-6 text-violet-600" />
                       <div className="text-left">
                         <p className="font-medium text-sm text-gray-900 dark:text-white">PDF Hisobot</p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Chop etish uchun tayyor</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Chop etish / Saqlash</p>
                       </div>
                     </Button>
                     <Button variant="outline" onClick={() => handleCopy(macroDroidUrl)} className="h-auto py-4 flex-col gap-2">
@@ -837,6 +933,13 @@ export default function SmartFinanceDashboard() {
                       <div className="text-left">
                         <p className="font-medium text-sm text-gray-900 dark:text-white">API URL</p>
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 break-all">{macroDroidUrl}</p>
+                      </div>
+                    </Button>
+                    <Button variant="outline" onClick={() => handleSendWeeklyReport} disabled={!weeklyPreview?.canSend} className="h-auto py-4 flex-col gap-2">
+                      <Megaphone className="w-6 h-6 text-emerald-600" />
+                      <div className="text-left">
+                        <p className="font-medium text-sm text-gray-900 dark:text-white">Haftalik xabar</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Telegram&apos;ga yuborish</p>
                       </div>
                     </Button>
                   </div>

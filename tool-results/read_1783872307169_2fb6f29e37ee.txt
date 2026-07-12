@@ -1,0 +1,445 @@
+   600→              </div>
+   601→            ) : (
+   602→              <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
+   603→                <CardContent className="py-16 text-center text-gray-400">
+   604→                  <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   605→                  <p className="text-sm">Hali operatsiya yo&apos;q</p>
+   606→                  <p className="text-xs mt-1">SMS tahlil qiling yoki &quot;Qo&apos;shish&quot; tugmasini bosing</p>
+   607→                </CardContent>
+   608→              </Card>
+   609→            )}
+   610→          </TabsContent>
+   611→
+   612→          {/* ====== Settings Tab ====== */}
+   613→          <TabsContent value="settings" className="space-y-6">
+   614→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   615→              {/* Budget Settings */}
+   616→              <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
+   617→                <CardHeader>
+   618→                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+   619→                    <Settings2 className="w-4 h-4 text-emerald-600" /> Byudjet foizlari
+   620→                  </CardTitle>
+   621→                  <CardDescription className="dark:text-gray-400">50/30/20 qoidasini o&apos;zgartiring. Yig&apos;indisi 100 bo&apos;lishi kerak.</CardDescription>
+   622→                </CardHeader>
+   623→                <CardContent className="space-y-6">
+   624→                  {[
+   625→                    { key: "needsPercent" as const, label: "Ehtiyojlar", color: NEEDS_COLOR },
+   626→                    { key: "wantsPercent" as const, label: "Xohish-istaklar", color: WANTS_COLOR },
+   627→                    { key: "savingsPercent" as const, label: "Tejash", color: SAVINGS_COLOR },
+   628→                  ].map((item) => (
+   629→                    <div key={item.key} className="space-y-2">
+   630→                      <div className="flex items-center justify-between">
+   631→                        <Label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+   632→                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+   633→                          {item.label}
+   634→                        </Label>
+   635→                        <span className="text-sm font-bold" style={{ color: item.color }}>{editSettings[item.key]}%</span>
+   636→                      </div>
+   637→                      <Slider value={[editSettings[item.key]]} max={100} min={0} step={1}
+   638→                        onValueChange={([v]) => {
+   639→                          if (item.key === "needsPercent") setEditSettings((p) => ({ ...p, needsPercent: v, savingsPercent: 100 - v - p.wantsPercent }));
+   640→                          else if (item.key === "wantsPercent") setEditSettings((p) => ({ ...p, wantsPercent: v, savingsPercent: 100 - p.needsPercent - v }));
+   641→                          else setEditSettings((p) => ({ ...p, savingsPercent: v, wantsPercent: 100 - p.needsPercent - v }));
+   642→                        }} />
+   643→                    </div>
+   644→                  ))}
+   645→                  <div className="h-3 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-700">
+   646→                    <div className="h-full transition-all duration-300" style={{ width: `${editSettings.needsPercent}%`, backgroundColor: NEEDS_COLOR }} />
+   647→                    <div className="h-full transition-all duration-300" style={{ width: `${editSettings.wantsPercent}%`, backgroundColor: WANTS_COLOR }} />
+   648→                    <div className="h-full transition-all duration-300" style={{ width: `${editSettings.savingsPercent}%`, backgroundColor: SAVINGS_COLOR }} />
+   649→                  </div>
+   650→                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+   651→                    <span>Jami: {editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent}%</span>
+   652→                    {editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent !== 100 && (
+   653→                      <span className="text-red-500 font-medium">Foizlar 100 bo&apos;lishi kerak!</span>
+   654→                    )}
+   655→                  </div>
+   656→                  <Button onClick={handleSaveSettings}
+   657→                    disabled={savingSettings || editSettings.needsPercent + editSettings.wantsPercent + editSettings.savingsPercent !== 100}
+   658→                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+   659→                    {savingSettings && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />} Saqlash
+   660→                  </Button>
+   661→                </CardContent>
+   662→              </Card>
+   663→
+   664→              {/* Payment Settings */}
+   665→              <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
+   666→                <CardHeader>
+   667→                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+   668→                    <Send className="w-4 h-4 text-emerald-600" /> To&apos;lov sozlamalari
+   669→                  </CardTitle>
+   670→                  <CardDescription className="dark:text-gray-400">Tejash kartasi ma&apos;lumotlarini kiriting</CardDescription>
+   671→                </CardHeader>
+   672→                <CardContent className="space-y-4">
+   673→                  <div className="space-y-2">
+   674→                    <Label className="text-gray-700 dark:text-gray-300">Tejash karta raqami</Label>
+   675→                    <Input placeholder="8600 1234 5678 9012" value={editSettings.savingsCardNumber}
+   676→                      onChange={(e) => setEditSettings((p) => ({ ...p, savingsCardNumber: e.target.value }))}
+   677→                      className="text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+   678→                  </div>
+   679→                  <div className="space-y-2">
+   680→                    <Label className="text-gray-700 dark:text-gray-300">To&apos;lov xizmati</Label>
+   681→                    <Select value={editSettings.paymentService} onValueChange={(v) => setEditSettings((p) => ({ ...p, paymentService: v }))}>
+   682→                      <SelectTrigger className="bg-white dark:bg-gray-700 dark:border-gray-600"><SelectValue /></SelectTrigger>
+   683→                      <SelectContent>
+   684→                        <SelectItem value="payme">Payme</SelectItem>
+   685→                        <SelectItem value="click">Click</SelectItem>
+   686→                      </SelectContent>
+   687→                    </Select>
+   688→                  </div>
+   689→                  <Button onClick={handleSaveSettings} disabled={savingSettings} variant="outline" className="w-full">
+   690→                    {savingSettings && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />} To&apos;lov sozlamalarini saqlash
+   691→                  </Button>
+   692→                </CardContent>
+   693→              </Card>
+   694→
+   695→              {/* API Key */}
+   696→              <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
+   697→                <CardHeader>
+   698→                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+   699→                    <Key className="w-4 h-4 text-emerald-600" /> API Kalit (MacroDroid)
+   700→                  </CardTitle>
+   701→                  <CardDescription className="dark:text-gray-400">MacroDroid orqali SMS yuborish uchun kerak</CardDescription>
+   702→                </CardHeader>
+   703→                <CardContent className="space-y-4">
+   704→                  {apiKey ? (
+   705→                    <div className="space-y-3">
+   706→                      <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+   707→                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">API Kalit:</p>
+   708→                        <code className="text-xs font-mono text-emerald-700 dark:text-emerald-400 break-all">{apiKey}</code>
+   709→                      </div>
+   710→                      <div className="flex gap-2">
+   711→                        <Button variant="outline" size="sm" onClick={() => handleCopy(apiKey)} className="flex-1 text-xs"><Copy className="w-3 h-3 mr-1.5" /> Nusxalash</Button>
+   712→                        <Button variant="outline" size="sm" onClick={handleGenerateApiKey} disabled={generatingKey} className="flex-1 text-xs">
+   713→                          {generatingKey ? <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1.5" />} Yangilash
+   714→                        </Button>
+   715→                      </div>
+   716→                    </div>
+   717→                  ) : (
+   718→                    <Button onClick={handleGenerateApiKey} disabled={generatingKey} variant="outline" className="w-full">
+   719→                      {generatingKey ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Key className="w-4 h-4 mr-2" />}
+   720→                      API Kalit generatsiya qilish
+   721→                    </Button>
+   722→                  )}
+   723→
+   724→                  <Separator className="dark:bg-gray-700" />
+   725→
+   726→                  <div className="space-y-2">
+   727→                    <Label className="text-gray-700 dark:text-gray-300 flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> MacroDroid sozlamasi</Label>
+   728→                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+   729→                      <p><strong>1.</strong> MacroDroid → Yangi Makro</p>
+   730→                      <p><strong>2.</strong> Trigger: <code className="bg-amber-100 dark:bg-amber-800/50 px-1 rounded">SMS kelganda</code> (Bank raqamidan)</p>
+   731→                      <p><strong>3.</strong> Action: <code className="bg-amber-100 dark:bg-amber-800/50 px-1 rounded">HTTP Request</code></p>
+   732→                      <p className="font-mono bg-white dark:bg-gray-800 p-2 rounded-lg border border-amber-200 dark:border-amber-600 mt-1 break-all">
+   733→                        POST {macroDroidUrl}
+   734→                      </p>
+   735→                      <p className="font-mono bg-white dark:bg-gray-800 p-2 rounded-lg border border-amber-200 dark:border-amber-600 break-all">
+   736→                        {`{"sms": "[sms_text]", "apiKey": "${apiKey}"}`}
+   737→                      </p>
+   738→                      <p><strong>4.</strong> Content-Type: <code className="bg-amber-100 dark:bg-amber-800/50 px-1 rounded">application/json</code></p>
+   739→                    </div>
+   740→                  </div>
+   741→                </CardContent>
+   742→              </Card>
+   743→
+   744→              {/* Telegram Bot Settings */}
+   745→              <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
+   746→                <CardHeader>
+   747→                  <div className="flex items-center justify-between">
+   748→                    <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+   749→                      <Bot className="w-4 h-4 text-emerald-600" /> Telegram Bot
+   750→                    </CardTitle>
+   751→                    <Badge variant={botStatus?.connected ? "default" : "secondary"}
+   752→                      className={botStatus?.connected ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]" : "bg-gray-100 text-gray-500 border-gray-200 text-[10px] dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600"}>
+   753→                      {botStatus?.connected ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
+   754→                      {botStatus?.connected ? "Ulangan" : "Ulanmagan"}
+   755→                    </Badge>
+   756→                  </div>
+   757→                  <CardDescription className="dark:text-gray-400">Bot orqali SMS yuborish va haftalik hisobot olish</CardDescription>
+   758→                </CardHeader>
+   759→                <CardContent className="space-y-4">
+   760→                  <div className="space-y-2">
+   761→                    <Label className="text-gray-700 dark:text-gray-300">Bot Token</Label>
+   762→                    <Input type="password" placeholder="123456:ABC-DEF..." value={editBotToken}
+   763→                      onChange={(e) => setEditBotToken(e.target.value)}
+   764→                      className="text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+   765→                  </div>
+   766→                  <div className="space-y-2">
+   767→                    <Label className="text-gray-700 dark:text-gray-300">Chat ID</Label>
+   768→                    <Input placeholder="123456789" value={editChatId}
+   769→                      onChange={(e) => setEditChatId(e.target.value)}
+   770→                      className="text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+   771→                    <p className="text-[11px] text-gray-400">@userinfobot ga xabar yuboring, Chat ID ni oling</p>
+   772→                  </div>
+   773→
+   774→                  <Separator className="dark:bg-gray-700" />
+   775→
+   776→                  <div className="grid grid-cols-2 gap-3">
+   777→                    <div className="space-y-2">
+   778→                      <Label className="text-gray-700 dark:text-gray-300">Hisobot kuni</Label>
+   779→                      <Select value={String(editReportDay)} onValueChange={(v) => setEditReportDay(Number(v))}>
+   780→                        <SelectTrigger className="bg-white dark:bg-gray-700 dark:border-gray-600"><SelectValue /></SelectTrigger>
+   781→                        <SelectContent>
+   782→                          {DAYS_UZ.filter(Boolean).map((d, i) => (<SelectItem key={i + 1} value={String(i + 1)}>{d}</SelectItem>))}
+   783→                        </SelectContent>
+   784→                      </Select>
+   785→                    </div>
+   786→                    <div className="space-y-2">
+   787→                      <Label className="text-gray-700 dark:text-gray-300">Soat</Label>
+   788→                      <Select value={String(editReportHour)} onValueChange={(v) => setEditReportHour(Number(v))}>
+   789→                        <SelectTrigger className="bg-white dark:bg-gray-700 dark:border-gray-600"><SelectValue /></SelectTrigger>
+   790→                        <SelectContent>
+   791→                          {Array.from({ length: 24 }, (_, i) => (<SelectItem key={i} value={String(i)}>{String(i).padStart(2, "0")}:00</SelectItem>))}
+   792→                        </SelectContent>
+   793→                      </Select>
+   794→                    </div>
+   795→                  </div>
+   796→
+   797→                  <div className="flex gap-2">
+   798→                    <Button onClick={handleSaveBotSettings} disabled={savingBot} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
+   799→                      {savingBot && <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />} Saqlash
+   800→                    </Button>
+   801→                    <Button onClick={handleTestBot} disabled={testingBot} variant="outline" className="text-xs">
+   802→                      <Radio className="w-3.5 h-3.5 mr-1.5" /> Tekshirish
+   803→                    </Button>
+   804→                    <Button onClick={handleSendTestMessage} disabled={testingBot} variant="outline" className="text-xs">
+   805→                      <Send className="w-3.5 h-3.5 mr-1.5" /> Test
+   806→                    </Button>
+   807→                  </div>
+   808→                </CardContent>
+   809→              </Card>
+   810→
+   811→              {/* Export & Deploy */}
+   812→              <Card className="lg:col-span-2 border-0 shadow-lg bg-white dark:bg-gray-800">
+   813→                <CardHeader>
+   814→                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+   815→                    <FileDown className="w-4 h-4 text-emerald-600" /> Export va Deploy
+   816→                  </CardTitle>
+   817→                  <CardDescription className="dark:text-gray-400">Ma&apos;lumotlarni export qilish va serverga joylashtirish</CardDescription>
+   818→                </CardHeader>
+   819→                <CardContent>
+   820→                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+   821→                    <Button variant="outline" onClick={() => window.open("/api/export/excel", "_blank")} className="h-auto py-4 flex-col gap-2">
+   822→                      <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+   823→                      <div className="text-left">
+   824→                        <p className="font-medium text-sm text-gray-900 dark:text-white">Excel Export</p>
+   825→                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Tranzaksiyalar + Hisobot</p>
+   826→                      </div>
+   827→                    </Button>
+   828→                    <Button variant="outline" onClick={() => window.open("/api/export/pdf", "_blank")} className="h-auto py-4 flex-col gap-2">
+   829→                      <FileDown className="w-6 h-6 text-violet-600" />
+   830→                      <div className="text-left">
+   831→                        <p className="font-medium text-sm text-gray-900 dark:text-white">PDF Hisobot</p>
+   832→                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Chop etish uchun tayyor</p>
+   833→                      </div>
+   834→                    </Button>
+   835→                    <Button variant="outline" onClick={() => handleCopy(macroDroidUrl)} className="h-auto py-4 flex-col gap-2">
+   836→                      <Link2 className="w-6 h-6 text-amber-600" />
+   837→                      <div className="text-left">
+   838→                        <p className="font-medium text-sm text-gray-900 dark:text-white">API URL</p>
+   839→                        <p className="text-[11px] text-gray-500 dark:text-gray-400 break-all">{macroDroidUrl}</p>
+   840→                      </div>
+   841→                    </Button>
+   842→                  </div>
+   843→                </CardContent>
+   844→              </Card>
+   845→            </div>
+   846→          </TabsContent>
+   847→        </Tabs>
+   848→      </main>
+   849→
+   850→      {/* Footer */}
+   851→      <footer className="mt-auto border-t border-gray-200/60 dark:border-gray-700/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg">
+   852→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+   853→          <p>Smart Finance Bot &copy; {new Date().getFullYear()} — Shaxsiy moliyaviy avtomatlashtirish</p>
+   854→          <div className="flex items-center gap-3">
+   855→            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /> Ma&apos;lumotlar mahalliy saqlanadi</span>
+   856→          </div>
+   857→        </div>
+   858→      </footer>
+   859→
+   860→      {/* Confirm Transfer Dialog */}
+   861→      <Dialog open={!!confirmTx} onOpenChange={() => setConfirmTx(null)}>
+   862→        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+   863→          <DialogHeader>
+   864→            <DialogTitle className="dark:text-white">O&apos;tkazmani tasdiqlash</DialogTitle>
+   865→            <DialogDescription className="dark:text-gray-400">
+   866→              Tejash kartasiga <strong>{confirmTx ? formatMoney(confirmTx.savingsAmount) : ""}</strong> o&apos;tkazishni tasdiqlaysizmi?
+   867→            </DialogDescription>
+   868→          </DialogHeader>
+   869→          <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 space-y-2 text-sm">
+   870→            <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Tushum:</span><span className="font-medium text-gray-900 dark:text-white">{confirmTx ? formatMoney(confirmTx.amount) : ""}</span></div>
+   871→            <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Tejash miqdori:</span><span className="font-medium text-emerald-600">{confirmTx ? formatMoney(confirmTx.savingsAmount) : ""}</span></div>
+   872→            <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Bank:</span><span className="font-medium text-gray-900 dark:text-white">{confirmTx?.bankName}</span></div>
+   873→          </div>
+   874→          {confirmTx?.paymentLink && (
+   875→            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-3">
+   876→              <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-2">To&apos;lov havolasi:</p>
+   877→              <div className="flex items-center gap-2">
+   878→                <code className="text-xs flex-1 bg-white dark:bg-gray-700 p-2 rounded-lg border truncate text-emerald-700 dark:text-emerald-400">{confirmTx.paymentLink}</code>
+   879→                <Button size="sm" variant="outline" onClick={() => handleCopy(confirmTx.paymentLink)}><Copy className="w-3.5 h-3.5" /></Button>
+   880→              </div>
+   881→            </div>
+   882→          )}
+   883→          <DialogFooter className="gap-2">
+   884→            <Button variant="outline" onClick={() => setConfirmTx(null)}><XCircle className="w-4 h-4 mr-1.5" /> Bekor qilish</Button>
+   885→            <Button onClick={() => confirmTx && handleConfirmTransfer(confirmTx.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+   886→              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Tasdiqlash
+   887→            </Button>
+   888→          </DialogFooter>
+   889→        </DialogContent>
+   890→      </Dialog>
+   891→
+   892→      {/* Add Manual Transaction Dialog */}
+   893→      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+   894→        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
+   895→          <DialogHeader>
+   896→            <DialogTitle className="dark:text-white">Operatsiya qo&apos;shish</DialogTitle>
+   897→            <DialogDescription className="dark:text-gray-400">Qo&apos;lda tushum operatsiyasini kiriting</DialogDescription>
+   898→          </DialogHeader>
+   899→          <div className="space-y-4">
+   900→            <div className="space-y-2">
+   901→              <Label className="text-gray-700 dark:text-gray-300">Miqdor (so&apos;m)</Label>
+   902→              <Input type="number" placeholder="500000" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} className="bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+   903→            </div>
+   904→            <div className="space-y-2">
+   905→              <Label className="text-gray-700 dark:text-gray-300">Bank nomi (ixtiyoriy)</Label>
+   906→              <Input placeholder="Uzum Bank" value={manualBank} onChange={(e) => setManualBank(e.target.value)} className="bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+   907→            </div>
+   908→          </div>
+   909→          <DialogFooter className="gap-2">
+   910→            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Bekor qilish</Button>
+   911→            <Button onClick={handleManualAdd} disabled={addingManual || !manualAmount} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+   912→              {addingManual ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> : <Plus className="w-4 h-4 mr-1.5" />} Qo&apos;shish
+   913→            </Button>
+   914→          </DialogFooter>
+   915→        </DialogContent>
+   916→      </Dialog>
+   917→    </div>
+   918→  );
+   919→}
+   920→
+   921→// ============================================================
+   922→// Sub Components
+   923→// ============================================================
+   924→function StatCard({ title, value, icon, color, subtitle }: {
+   925→  title: string; value: string; icon: React.ReactNode;
+   926→  color: "emerald" | "amber" | "violet" | "green"; subtitle: string;
+   927→}) {
+   928→  const cm: Record<string, string> = {
+   929→    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800",
+   930→    amber: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/30 dark:border-amber-800",
+   931→    violet: "bg-violet-50 text-violet-600 border-violet-100 dark:bg-violet-900/30 dark:border-violet-800",
+   932→    green: "bg-green-50 text-green-600 border-green-100 dark:bg-green-900/30 dark:border-green-800",
+   933→  };
+   934→  const ib: Record<string, string> = {
+   935→    emerald: "bg-emerald-100 text-emerald-600 dark:bg-emerald-800 dark:text-emerald-400",
+   936→    amber: "bg-amber-100 text-amber-600 dark:bg-amber-800 dark:text-amber-400",
+   937→    violet: "bg-violet-100 text-violet-600 dark:bg-violet-800 dark:text-violet-400",
+   938→    green: "bg-green-100 text-green-600 dark:bg-green-800 dark:text-green-400",
+   939→  };
+   940→  return (
+   941→    <Card className="border-0 shadow-lg bg-white dark:bg-gray-800 overflow-hidden relative">
+   942→      <CardContent className="p-4 sm:p-5">
+   943→        <div className="flex items-start justify-between mb-3">
+   944→          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ib[color]}`}>{icon}</div>
+   945→          <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 border ${cm[color]}`}>{subtitle}</Badge>
+   946→        </div>
+   947→        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{title}</p>
+   948→        <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight">{value}</p>
+   949→      </CardContent>
+   950→    </Card>
+   951→  );
+   952→}
+   953→
+   954→function LegendDot({ color, label }: { color: string; label: string }) {
+   955→  return (<div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="text-xs text-gray-600 dark:text-gray-400">{label}</span></div>);
+   956→}
+   957→
+   958→function WeeklyRow({ label, value, color }: { label: string; value: number; color: string }) {
+   959→  return (
+   960→    <div className="flex items-center justify-between">
+   961→      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} /><span className="text-sm text-gray-600 dark:text-gray-400">{label}</span></div>
+   962→      <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatMoney(value)}</span>
+   963→    </div>
+   964→  );
+   965→}
+   966→
+   967→function BreakdownRow({ label, pct, amount, color }: { label: string; pct: number; amount: number; color: string }) {
+   968→  return (
+   969→    <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600">
+   970→      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} /><span className="text-sm text-gray-700 dark:text-gray-300">{label}</span></div>
+   971→      <div className="text-right"><div className="text-sm font-semibold text-gray-900 dark:text-white">{formatMoney(amount)}</div><div className="text-xs text-gray-400">{pct}%</div></div>
+   972→    </div>
+   973→  );
+   974→}
+   975→
+   976→function TransactionCard({ tx, onConfirm, onCopyLink, onDelete }: {
+   977→  tx: Transaction; onConfirm: () => void; onCopyLink: () => void; onDelete: () => void;
+   978→}) {
+   979→  const [expanded, setExpanded] = useState(false);
+   980→  return (
+   981→    <Card className="border-0 shadow-md bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow">
+   982→      <CardContent className="p-4">
+   983→        <div className="flex items-start justify-between gap-3">
+   984→          <div className="flex-1 min-w-0">
+   985→            <div className="flex items-center gap-2 mb-1">
+   986→              <span className="font-bold text-gray-900 dark:text-white">{formatMoney(tx.amount)}</span>
+   987→              <Badge variant={tx.savingsTransferred ? "default" : "secondary"}
+   988→                className={tx.savingsTransferred ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] dark:bg-emerald-900/30 dark:border-emerald-700" : "bg-amber-100 text-amber-700 border-amber-200 text-[10px] dark:bg-amber-900/30 dark:border-amber-700"}>
+   989→                {tx.savingsTransferred ? "Tasdiqlangan" : "Kutilmoqda"}
+   990→              </Badge>
+   991→            </div>
+   992→            <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+   993→              <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{tx.bankName}</span>
+   994→              {tx.cardLast4 && <span>****{tx.cardLast4}</span>}
+   995→              <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(tx.createdAt).toLocaleDateString("uz-UZ", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+   996→            </div>
+   997→          </div>
+   998→          <div className="flex items-center gap-1.5 shrink-0">
+   999→            {!tx.savingsTransferred && (
+  1000→              <Button size="sm" variant="outline" className="h-8 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-700" onClick={onConfirm}>
+  1001→                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Tasdiqlash
+  1002→              </Button>
+  1003→            )}
+  1004→            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onDelete}><Trash2 className="w-3.5 h-3.5 text-gray-400" /></Button>
+  1005→          </div>
+  1006→        </div>
+  1007→        {expanded && (
+  1008→          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+  1009→            <div className="grid grid-cols-3 gap-3 mb-3">
+  1010→              <div className="text-center p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20"><p className="text-[10px] text-amber-600 mb-0.5">Ehtiyojlar</p><p className="text-sm font-semibold text-amber-700 dark:text-amber-400">{formatMoney(tx.needsAmount)}</p></div>
+  1011→              <div className="text-center p-2 rounded-lg bg-violet-50 dark:bg-violet-900/20"><p className="text-[10px] text-violet-600 mb-0.5">Xohish-istaklar</p><p className="text-sm font-semibold text-violet-700 dark:text-violet-400">{formatMoney(tx.wantsAmount)}</p></div>
+  1012→              <div className="text-center p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20"><p className="text-[10px] text-emerald-600 mb-0.5">Tejash</p><p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{formatMoney(tx.savingsAmount)}</p></div>
+  1013→            </div>
+  1014→            {tx.paymentLink && (
+  1015→              <div className="flex items-center gap-2">
+  1016→                <code className="text-xs flex-1 text-emerald-700 dark:text-emerald-400 bg-gray-50 dark:bg-gray-700 p-2 rounded-lg border truncate">{tx.paymentLink}</code>
+  1017→                <Button size="sm" variant="outline" onClick={onCopyLink}><Copy className="w-3 h-3 mr-1" /><span className="text-xs">Nusxa</span></Button>
+  1018→                <a href={tx.paymentLink} target="_blank" rel="noopener noreferrer"><Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white"><ExternalLink className="w-3 h-3" /></Button></a>
+  1019→              </div>
+  1020→            )}
+  1021→            <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-xs text-gray-500 dark:text-gray-400 max-h-20 overflow-y-auto">{tx.smsText}</div>
+  1022→          </motion.div>
+  1023→        )}
+  1024→        <button onClick={() => setExpanded(!expanded)} className="mt-2 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+  1025→          <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} /> Batafsil
+  1026→        </button>
+  1027→      </CardContent>
+  1028→    </Card>
+  1029→  );
+  1030→}
+  1031→
+  1032→function DashboardSkeleton() {
+  1033→  return (
+  1034→    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+  1035→      <header className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200/60 dark:border-gray-700">
+  1036→        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center"><Skeleton className="w-9 h-9 rounded-xl" /><div className="ml-3 space-y-1"><Skeleton className="w-32 h-5" /><Skeleton className="w-48 h-3 hidden sm:block" /></div></div>
+  1037→      </header>
+  1038→      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  1039→        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[1,2,3,4].map((i) => (<Card key={i} className="border-0 shadow-lg"><CardContent className="p-5"><Skeleton className="w-10 h-10 rounded-xl mb-3" /><Skeleton className="w-24 h-3 mb-2" /><Skeleton className="w-full h-6" /></CardContent></Card>))}</div>
+  1040→        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{[1,2].map((i) => (<Card key={i} className="border-0 shadow-lg"><CardContent className="p-6"><Skeleton className="w-40 h-5 mb-4" /><Skeleton className="w-full h-[260px] rounded-xl" /></CardContent></Card>))}</div>
+  1041→      </main>
+  1042→    </div>
+  1043→  );
+  1044→}

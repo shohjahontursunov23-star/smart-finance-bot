@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 // SMS parsing patterns for Uzbekistan banks
 function detectBank(sms: string): string {
   const bankKeywords: { bank: string; keywords: string[] }[] = [
@@ -56,20 +66,20 @@ export async function POST(request: Request) {
     const { sms, apiKey: providedKey } = body;
 
     if (!sms || typeof sms !== "string") {
-      return NextResponse.json({ error: "SMS matni talab qilinadi" }, { status: 400 });
+      return NextResponse.json({ error: "SMS matni talab qilinadi" }, { status: 400, headers: CORS_HEADERS });
     }
 
     // Check API key if set in settings
     const settings = await db.settings.findUnique({ where: { id: "default" } });
     if (settings?.apiKey && settings.apiKey.length > 10) {
       if (providedKey !== settings.apiKey) {
-        return NextResponse.json({ error: "API kalit noto'g'ri" }, { status: 401 });
+        return NextResponse.json({ error: "API kalit noto'g'ri" }, { status: 401, headers: CORS_HEADERS });
       }
     }
 
     const amount = extractAmount(sms);
     if (amount === null) {
-      return NextResponse.json({ error: "SMS'dan pul miqdorini aniqlab bo'lmadi", parsed: false }, { status: 422 });
+      return NextResponse.json({ error: "SMS'dan pul miqdorini aniqlab bo'lmadi", parsed: false }, { status: 422, headers: CORS_HEADERS });
     }
 
     const bankName = detectBank(sms);
@@ -100,7 +110,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // Notify Telegram bot mini-service if running
+    // Notify Telegram bot mini-service if running (non-fatal)
     try {
       await fetch(`http://localhost:3003/notify`, {
         method: "POST",
@@ -125,9 +135,9 @@ export async function POST(request: Request) {
         wants: { percent: wantsPct, amount: wantsAmount, label: "Xohish-istaklar" },
         savings: { percent: savingsPct, amount: savingsAmount, label: "Tejash" },
       },
-    });
+    }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("SMS parse error:", error);
-    return NextResponse.json({ error: "Server xatosi" }, { status: 500 });
+    return NextResponse.json({ error: "Server xatosi" }, { status: 500, headers: CORS_HEADERS });
   }
 }
