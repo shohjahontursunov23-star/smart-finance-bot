@@ -6,10 +6,12 @@ export async function POST() {
     const settings = await db.settings.findUnique({ where: { id: "default" } });
 
     if (!settings?.telegramBotToken || !settings?.telegramChatId) {
-      return NextResponse.json({ success: false, error: "Bot token yoki Chat ID kiritilmagan. Sozlamalar → Telegram Bot" });
+      return NextResponse.json({
+        success: false,
+        error: "Bot token yoki Chat ID kiritilmagan. Sozlamalar → Telegram Bot",
+      });
     }
 
-    // Get current week data
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -26,14 +28,18 @@ export async function POST() {
     const totalNeeds = weekTransactions.reduce((s, t) => s + t.needsAmount, 0);
     const totalWants = weekTransactions.reduce((s, t) => s + t.wantsAmount, 0);
     const totalSavings = weekTransactions.reduce((s, t) => s + t.savingsAmount, 0);
-    const transferred = weekTransactions.filter((t) => t.savingsTransferred).reduce((s, t) => s + t.savingsAmount, 0);
+    const transferred = weekTransactions
+      .filter((t) => t.savingsTransferred)
+      .reduce((s, t) => s + t.savingsAmount, 0);
     const pending = totalSavings - transferred;
 
     const fmt = (n: number) => n.toLocaleString("uz-UZ");
+    const reportDate = now.toLocaleDateString("uz-UZ", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
 
-    const reportDate = now.toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" });
-
-    // Build Telegram message
     const message = [
       `<b>📊 Haftalik Moliyaviy Hisobot</b>`,
       `<i>${reportDate}</i>`,
@@ -52,19 +58,22 @@ export async function POST() {
       `<b>📋 Operatsiyalar:</b> ${weekTransactions.length} ta`,
     ].join("\n");
 
-    // Add last 5 transactions
     const recent = weekTransactions.slice(0, 5);
     if (recent.length > 0) {
       message.push(`\n<b>So'nggi operatsiyalar:</b>`);
       for (const tx of recent) {
-        const date = new Date(tx.createdAt).toLocaleDateString("uz-UZ", { day: "2-digit", month: "short" });
-        message.push(`  • ${date} | ${tx.bankName} | <b>${fmt(tx.amount)}</b> so'm`);
+        const date = new Date(tx.createdAt).toLocaleDateString("uz-UZ", {
+          day: "2-digit",
+          month: "short",
+        });
+        message.push(
+          `  • ${date} | ${tx.bankName} | <b>${fmt(tx.amount)}</b> so'm`
+        );
       }
     }
 
     message.push(`\n<i>— Smart Finance Bot</i>`);
 
-    // Send via Telegram
     const res = await fetch(
       `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage`,
       {
@@ -84,21 +93,21 @@ export async function POST() {
       return NextResponse.json({
         success: true,
         message: "Haftalik hisobot Telegram'ga yuborildi",
-        report: {
-          totalIncome, totalNeeds, totalWants, totalSavings,
-          transferred, pending, transactionCount: weekTransactions.length,
-        },
       });
     }
 
-    return NextResponse.json({ success: false, error: "Telegram'ga yuborish xatosi: " + (data.description || "Noto'g'ri token/Chat ID") });
+    return NextResponse.json({
+      success: false,
+      error:
+        "Telegram'ga yuborish xatosi: " +
+        (data.description || "Noto'g'ri token/Chat ID"),
+    });
   } catch (error) {
     console.error("Weekly report error:", error);
     return NextResponse.json({ success: false, error: "Server xatosi" }, { status: 500 });
   }
 }
 
-// GET — preview the report without sending
 export async function GET() {
   try {
     const settings = await db.settings.findUnique({ where: { id: "default" } });
@@ -114,7 +123,9 @@ export async function GET() {
     const totalNeeds = weekTransactions.reduce((s, t) => s + t.needsAmount, 0);
     const totalWants = weekTransactions.reduce((s, t) => s + t.wantsAmount, 0);
     const totalSavings = weekTransactions.reduce((s, t) => s + t.savingsAmount, 0);
-    const transferred = weekTransactions.filter((t) => t.savingsTransferred).reduce((s, t) => s + t.savingsAmount, 0);
+    const transferred = weekTransactions
+      .filter((t) => t.savingsTransferred)
+      .reduce((s, t) => s + t.savingsAmount, 0);
 
     const nextReport = new Date();
     const dayOfWeek = settings?.reportDayOfWeek ?? 7;
@@ -133,8 +144,12 @@ export async function GET() {
       reportDayOfWeek: settings?.reportDayOfWeek ?? 7,
       reportHour: settings?.reportHour ?? 20,
       preview: {
-        totalIncome, totalNeeds, totalWants, totalSavings,
-        transferred, pending: totalSavings - transferred,
+        totalIncome,
+        totalNeeds,
+        totalWants,
+        totalSavings,
+        transferred,
+        pending: totalSavings - transferred,
         transactionCount: weekTransactions.length,
       },
     });

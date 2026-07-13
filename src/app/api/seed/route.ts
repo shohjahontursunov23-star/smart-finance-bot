@@ -1,19 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const SAMPLE_SMS = [
-  "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
-  "Kapitalbank: Kartangizga 1,250,000 so'm tushdi. Karta ****4567. Balans: 3,200,000 so'm.",
-  "TBC Bank: Hisobingizga 320,000 so'm o'tkazildi. Karta ****8901.",
-  "Anorbank: Kartaingizga 750,000 so'm tushdi. Balans: 2,100,000 so'm. Karta: ****2345.",
-  "Uzum Bank: Karta ****6789. Kartaingizga 2,000,000 so'm o'tkazildi. Balans: 5,500,000 so'm.",
-  "NBU: Kartangizga 180,000 so'm tushdi. Karta ****1111. Balans: 900,000 so'm.",
-  "Uzum Bank: Karta ****1234. Kartaingizga 95,000 so'm o'tkazildi. Balans: 645,000 so'm.",
-  "Kapitalbank: Hisobingizga 3,500,000 so'm tushdi. Karta ****4567. Balans: 8,700,000 so'm.",
-];
-
 export async function POST() {
   try {
+    // Default settings qo'shish (agar yo'q bo'lsa)
     await db.settings.upsert({
       where: { id: "default" },
       update: {},
@@ -25,7 +15,19 @@ export async function POST() {
     const wantsPct = settings?.wantsPercent ?? 30;
     const savingsPct = settings?.savingsPercent ?? 20;
 
+    // Eski tranzaksiyalarni tozalash
     await db.transaction.deleteMany({});
+
+    const SAMPLE_SMS = [
+      "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
+      "Kapitalbank: Kartangizga 1,250,000 so'm tushdi. Karta ****4567. Balans: 3,200,000 so'm.",
+      "TBC Bank: Hisobingizga 320,000 so'm o'tkazildi. Karta ****8901.",
+      "Anorbank: Kartaingizga 750,000 so'm tushdi. Balans: 2,100,000 so'm. Karta: ****2345.",
+      "Uzum Bank: Karta ****6789. Kartaingizga 2,000,000 so'm o'tkazildi. Balans: 5,500,000 so'm.",
+      "NBU: Kartangizga 180,000 so'm tushdi. Karta ****1111. Balans: 900,000 so'm.",
+      "Uzum Bank: Karta ****1234. Kartaingizga 95,000 so'm o'tkazildi. Balans: 645,000 so'm.",
+      "Kapitalbank: Hisobingizga 3,500,000 so'm tushdi. Karta ****4567. Balans: 8,700,000 so'm.",
+    ];
 
     const created = [];
     for (const sms of SAMPLE_SMS) {
@@ -54,8 +56,14 @@ export async function POST() {
 
       const tx = await db.transaction.create({
         data: {
-          amount, needsAmount, wantsAmount, savingsAmount,
-          smsText: sms, bankName, cardLast4, paymentLink: "",
+          amount,
+          needsAmount,
+          wantsAmount,
+          savingsAmount,
+          smsText: sms,
+          bankName,
+          cardLast4,
+          paymentLink: "",
           savingsTransferred: Math.random() > 0.4,
           confirmedAt: Math.random() > 0.4 ? pastDate : null,
           createdAt: pastDate,
@@ -64,10 +72,17 @@ export async function POST() {
       created.push(tx);
     }
 
-    return NextResponse.json({ success: true, count: created.length, message: `${created.length} ta namuna operatsiya qo'shildi` });
+    return NextResponse.json({
+      success: true,
+      count: created.length,
+      message: `${created.length} ta namuna operatsiya qo'shildi`,
+    });
   } catch (error) {
     console.error("Seed error:", error);
     const msg = error instanceof Error ? error.message : "Noma'lum xatolik";
-    return NextResponse.json({ success: false, error: "Server xatosi", details: msg }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Server xatosi", details: msg },
+      { status: 500 }
+    );
   }
 }

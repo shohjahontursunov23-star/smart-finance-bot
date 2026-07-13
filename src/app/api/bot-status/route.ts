@@ -7,10 +7,12 @@ export async function GET() {
     if (!settings?.telegramBotToken) {
       return NextResponse.json({ connected: false, message: "Bot token kiritilmagan" });
     }
+
     const res = await fetch(
       `https://api.telegram.org/bot${settings.telegramBotToken}/getMe`
     );
     const data = await res.json();
+
     if (data.ok) {
       return NextResponse.json({
         connected: true,
@@ -18,6 +20,7 @@ export async function GET() {
         username: data.result.username,
       });
     }
+
     return NextResponse.json({ connected: false, message: "Bot token noto'g'ri" });
   } catch {
     return NextResponse.json({ connected: false, message: "Tekshirib bo'lmadi" });
@@ -28,9 +31,11 @@ export async function POST(request: Request) {
   try {
     const { message } = await request.json();
     const settings = await db.settings.findUnique({ where: { id: "default" } });
+
     if (!settings?.telegramBotToken || !settings?.telegramChatId) {
       return NextResponse.json({ success: false, error: "Bot token yoki Chat ID kiritilmagan" });
     }
+
     const res = await fetch(
       `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage`,
       {

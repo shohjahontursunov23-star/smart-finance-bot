@@ -30,7 +30,7 @@ export async function PUT(request: Request) {
       reportHour,
     } = body;
 
-    // Validate percentages sum to 100
+    // Foizlar yig'indisi 100 bo'lishi kerak
     const total =
       (needsPercent ?? 50) + (wantsPercent ?? 30) + (savingsPercent ?? 20);
     if (total !== 100) {

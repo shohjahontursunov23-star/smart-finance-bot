@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 export async function GET() {
   try {
     const txs = await db.transaction.findMany({ orderBy: { createdAt: "desc" } });
+
     const rows = txs.map((tx) => ({
       Sana: new Date(tx.createdAt).toLocaleDateString("uz-UZ"),
       Bank: tx.bankName,
@@ -27,7 +28,9 @@ export async function GET() {
     const settings = await db.settings.findUnique({ where: { id: "default" } });
     const totalIncome = txs.reduce((s, t) => s + t.amount, 0);
     const totalSavings = txs.reduce((s, t) => s + t.savingsAmount, 0);
-    const transferred = txs.filter((t) => t.savingsTransferred).reduce((s, t) => s + t.savingsAmount, 0);
+    const transferred = txs
+      .filter((t) => t.savingsTransferred)
+      .reduce((s, t) => s + t.savingsAmount, 0);
 
     const summaryRows = [
       { "": "UMUMIY HISOBOT" },
@@ -48,7 +51,8 @@ export async function GET() {
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     return new NextResponse(buf, {
       headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="smart-finance-${new Date().toISOString().slice(0, 10)}.xlsx"`,
       },
     });
