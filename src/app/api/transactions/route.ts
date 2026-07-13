@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import db from "@/lib/db";
 
 export async function GET() {
   try {
-    const transactions = await db.transaction.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const transactions = db.prepare("SELECT * FROM Transaction ORDER BY createdAt DESC").all();
     return NextResponse.json(transactions);
   } catch (error) {
     console.error("GET transactions error:", error);
@@ -19,16 +17,13 @@ export async function POST(request: Request) {
     const { amount, bankName, cardLast4, smsText } = body;
 
     if (!amount || typeof amount !== "number" || amount <= 0) {
-      return NextResponse.json(
-        { error: "Miqdor noto'g'ri" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Miqdor noto'g'ri" }, { status: 400 });
     }
 
-    const settings = await db.settings.findUnique({ where: { id: "default" } });
-    const needsPct = settings?.needsPercent ?? 50;
-    const wantsPct = settings?.wantsPercent ?? 30;
-    const savingsPct = settings?.savingsPercent ?? 20;
+    const settings = db.prepare("SELECT * FROM Settings WHERE id = 'default'").get() as Record<string, unknown>;
+    const needsPct = Number(settings?.needsPercent ?? 50);
+    const wantsPct = Number(settings?.wantsPercent ?? 30);
+    const savingsPct = Number(settings?.savingsPercent ?? 20);
 
     const needsAmount = Math.round((amount * needsPct) / 100);
     const wantsAmount = Math.round((amount * wantsPct) / 100);
@@ -36,7 +31,7 @@ export async function POST(request: Request) {
 
     let paymentLink = "";
     if (settings?.savingsCardNumber) {
-      const cardNum = settings.savingsCardNumber.replace(/\s/g, "");
+      const cardNum = String(settings.savingsCardNumber).replace(/\s/g, "");
       if (settings.paymentService === "click") {
         paymentLink = `https://click.uz/pay?card=${cardNum}&amount=${savingsAmount}`;
       } else {
@@ -44,19 +39,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const transaction = await db.transaction.create({
-      data: {
-        amount,
-        needsAmount,
-        wantsAmount,
-        savingsAmount,
-        smsText: smsText || `Qo'lda kiritilgan: ${amount} so'm`,
-        bankName: bankName || "Qo'lda",
-        cardLast4: cardLast4 || "",
-        paymentLink,
-      },
-    });
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let id = "";
+    for (let i = 0; i < 20; i++) id += chars[Math.floor(Math.random() * chars.length)];
+    const now = new Date().toISOString();
 
+    db.prepare(`
+      INSERT INTO Transaction (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, amount, needsAmount, wantsAmount, savingsAmount, smsText || `Qo'lda kiritilgan: ${amount} so'm`, bankName || "Qo'lda", cardLast4 || "", paymentLink, now, now);
+
+    const transaction = db.prepare("SELECT * FROM Transaction WHERE id = ?").get(id);
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {
     console.error("POST transaction error:", error);

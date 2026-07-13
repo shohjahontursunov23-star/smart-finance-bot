@@ -1,22 +1,16 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import db from "@/lib/db";
 
 export async function POST() {
   try {
-    // Default settings qo'shish (agar yo'q bo'lsa)
-    await db.settings.upsert({
-      where: { id: "default" },
-      update: {},
-      create: { id: "default" },
-    });
+    db.prepare("INSERT OR IGNORE INTO Settings (id) VALUES ('default')").run();
+    const settings = db.prepare("SELECT * FROM Settings WHERE id = 'default'").get() as Record<string, unknown>;
 
-    const settings = await db.settings.findUnique({ where: { id: "default" } });
-    const needsPct = settings?.needsPercent ?? 50;
-    const wantsPct = settings?.wantsPercent ?? 30;
-    const savingsPct = settings?.savingsPercent ?? 20;
+    const needsPct = Number(settings?.needsPercent ?? 50);
+    const wantsPct = Number(settings?.wantsPercent ?? 30);
+    const savingsPct = Number(settings?.savingsPercent ?? 20);
 
-    // Eski tranzaksiyalarni tozalash
-    await db.transaction.deleteMany({});
+    db.prepare("DELETE FROM Transaction").run();
 
     const SAMPLE_SMS = [
       "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
@@ -29,7 +23,14 @@ export async function POST() {
       "Kapitalbank: Hisobingizga 3,500,000 so'm tushdi. Karta ****4567. Balans: 8,700,000 so'm.",
     ];
 
-    const created = [];
+    const insert = db.prepare(`
+      INSERT INTO Transaction (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, savingsTransferred, confirmedAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let count = 0;
+
     for (const sms of SAMPLE_SMS) {
       const match = sms.match(/(\d[\d\s,.]*)\s*(?:so'm|UZS)/i);
       if (!match) continue;
@@ -47,42 +48,29 @@ export async function POST() {
       const cardMatch = sms.match(/\*{0,4}(\d{4})/);
       const cardLast4 = cardMatch ? cardMatch[1] : "";
 
-      const needsAmount = Math.round((amount * needsPct) / 100);
-      const wantsAmount = Math.round((amount * wantsPct) / 100);
-      const savingsAmount = Math.round((amount * savingsPct) / 100);
+      let id = "";
+      for (let i = 0; i < 20; i++) id += chars[Math.floor(Math.random() * chars.length)];
 
       const daysAgo = Math.floor(Math.random() * 30);
-      const pastDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+      const pastDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+      const transferred = Math.random() > 0.4 ? 1 : 0;
 
-      const tx = await db.transaction.create({
-        data: {
-          amount,
-          needsAmount,
-          wantsAmount,
-          savingsAmount,
-          smsText: sms,
-          bankName,
-          cardLast4,
-          paymentLink: "",
-          savingsTransferred: Math.random() > 0.4,
-          confirmedAt: Math.random() > 0.4 ? pastDate : null,
-          createdAt: pastDate,
-        },
-      });
-      created.push(tx);
+      insert.run(
+        id, amount,
+        Math.round((amount * needsPct) / 100),
+        Math.round((amount * wantsPct) / 100),
+        Math.round((amount * savingsPct) / 100),
+        sms, bankName, cardLast4, "",
+        transferred,
+        transferred ? pastDate : null,
+        pastDate, pastDate
+      );
+      count++;
     }
 
-    return NextResponse.json({
-      success: true,
-      count: created.length,
-      message: `${created.length} ta namuna operatsiya qo'shildi`,
-    });
+    return NextResponse.json({ success: true, count, message: `${count} ta namuna operatsiya qo'shildi` });
   } catch (error) {
     console.error("Seed error:", error);
-    const msg = error instanceof Error ? error.message : "Noma'lum xatolik";
-    return NextResponse.json(
-      { success: false, error: "Server xatosi", details: msg },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Server xatosi" }, { status: 500 });
   }
 }

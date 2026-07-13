@@ -1,67 +1,67 @@
-import { PrismaClient } from '@prisma/client'
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
+const DB_PATH = process.env.DATABASE_URL?.replace("file:", "") || "/tmp/custom.db";
 
-async function ensureTables(db: PrismaClient) {
-  try {
-    await db.settings.findFirst()
-    return
-  } catch {}
+let _db: Database.Database | null = null;
 
-  try {
-    await db.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Settings" (
-        "id"                TEXT NOT NULL PRIMARY KEY,
-        "needsPercent"      INTEGER NOT NULL DEFAULT 50,
-        "wantsPercent"      INTEGER NOT NULL DEFAULT 30,
-        "savingsPercent"    INTEGER NOT NULL DEFAULT 20,
-        "savingsCardNumber" TEXT NOT NULL DEFAULT '',
-        "savingsCardBank"   TEXT NOT NULL DEFAULT 'payme',
-        "telegramBotToken"  TEXT NOT NULL DEFAULT '',
-        "telegramChatId"    TEXT NOT NULL DEFAULT '',
-        "reportDayOfWeek"   INTEGER NOT NULL DEFAULT 7,
-        "reportHour"        INTEGER NOT NULL DEFAULT 20,
-        "paymentService"    TEXT NOT NULL DEFAULT 'payme',
-        "apiKey"            TEXT NOT NULL DEFAULT '',
-        "createdAt"         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt"         DATETIME NOT NULL
-      )
-    `)
-  } catch {}
+function getDb(): Database.Database {
+  if (_db) return _db;
 
-  try {
-    await db.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Transaction" (
-        "id"                 TEXT NOT NULL PRIMARY KEY,
-        "amount"             INTEGER NOT NULL,
-        "needsAmount"        INTEGER NOT NULL,
-        "wantsAmount"        INTEGER NOT NULL,
-        "savingsAmount"      INTEGER NOT NULL,
-        "savingsTransferred" BOOLEAN NOT NULL DEFAULT 0,
-        "smsText"            TEXT NOT NULL,
-        "bankName"           TEXT NOT NULL DEFAULT '',
-        "cardLast4"          TEXT NOT NULL DEFAULT '',
-        "paymentLink"        TEXT NOT NULL DEFAULT '',
-        "confirmedAt"        DATETIME,
-        "createdAt"          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt"          DATETIME NOT NULL
-      )
-    `)
-  } catch {}
+  const dir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 
-  try {
-    await db.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "Settings" ("id") VALUES ('default')`
+  _db = new Database(DB_PATH);
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
+
+  // Settings jadvali
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS Settings (
+      id                TEXT PRIMARY KEY DEFAULT 'default',
+      needsPercent      INTEGER NOT NULL DEFAULT 50,
+      wantsPercent      INTEGER NOT NULL DEFAULT 30,
+      savingsPercent    INTEGER NOT NULL DEFAULT 20,
+      savingsCardNumber TEXT NOT NULL DEFAULT '',
+      savingsCardBank   TEXT NOT NULL DEFAULT 'payme',
+      telegramBotToken  TEXT NOT NULL DEFAULT '',
+      telegramChatId    TEXT NOT NULL DEFAULT '',
+      reportDayOfWeek   INTEGER NOT NULL DEFAULT 7,
+      reportHour        INTEGER NOT NULL DEFAULT 20,
+      paymentService    TEXT NOT NULL DEFAULT 'payme',
+      apiKey            TEXT NOT NULL DEFAULT '',
+      createdAt         TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt         TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  } catch {}
+  `);
+
+  // Transaction jadvali
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS Transaction (
+      id                 TEXT PRIMARY KEY,
+      amount             INTEGER NOT NULL,
+      needsAmount        INTEGER NOT NULL,
+      wantsAmount        INTEGER NOT NULL,
+      savingsAmount      INTEGER NOT NULL,
+      savingsTransferred INTEGER NOT NULL DEFAULT 0,
+      smsText            TEXT NOT NULL,
+      bankName           TEXT NOT NULL DEFAULT '',
+      cardLast4          TEXT NOT NULL DEFAULT '',
+      paymentLink        TEXT NOT NULL DEFAULT '',
+      confirmedAt        TEXT,
+      createdAt          TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt          TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Default settings qo'shish
+  _db.exec(`INSERT OR IGNORE INTO Settings (id) VALUES ('default')`);
+
+  return _db;
 }
 
-const db = globalForPrisma.prisma ?? new PrismaClient()
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
-
-ensureTables(db).catch((e) => console.error('ensureTables error:', e))
-
-export { db }
+export const db = getDb();
+export default db;

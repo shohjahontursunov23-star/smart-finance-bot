@@ -1,85 +1,60 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import db from "@/lib/db";
 
 export async function GET() {
   try {
     const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    monthEnd.replace("T00", "T00"); // just ensure format
 
-    // Oylik statistika
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthTxs = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? AND createdAt < ? ORDER BY createdAt DESC").all(monthStart, new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()) as Record<string, unknown>[];
 
-    const monthTransactions = await db.transaction.findMany({
-      where: { createdAt: { gte: monthStart, lt: monthEnd } },
-      orderBy: { createdAt: "desc" },
-    });
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const weekTxs = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? ORDER BY createdAt DESC").all(weekAgo) as Record<string, unknown>[];
 
-    const totalIncome = monthTransactions.reduce((s, t) => s + t.amount, 0);
-    const totalNeeds = monthTransactions.reduce((s, t) => s + t.needsAmount, 0);
-    const totalWants = monthTransactions.reduce((s, t) => s + t.wantsAmount, 0);
-    const totalSavings = monthTransactions.reduce((s, t) => s + t.savingsAmount, 0);
-    const transferredSavings = monthTransactions
-      .filter((t) => t.savingsTransferred)
-      .reduce((s, t) => s + t.savingsAmount, 0);
+    const sum = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, t) => s + Number(t[key] || 0), 0);
+    const sumIf = (arr: Record<string, unknown>[], key: string, filterKey: string) => arr.filter(t => Number(t[filterKey]) === 1).reduce((s, t) => s + Number(t[key] || 0), 0);
 
-    // Haftalik statistika
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const weekTransactions = await db.transaction.findMany({
-      where: { createdAt: { gte: weekAgo } },
-      orderBy: { createdAt: "desc" },
-    });
-
-    const weekIncome = weekTransactions.reduce((s, t) => s + t.amount, 0);
-    const weekNeeds = weekTransactions.reduce((s, t) => s + t.needsAmount, 0);
-    const weekWants = weekTransactions.reduce((s, t) => s + t.wantsAmount, 0);
-    const weekSavings = weekTransactions.reduce((s, t) => s + t.savingsAmount, 0);
-
-    // Kunlik statistika (oxirgi 14 kun)
+    // Kunlik statistika
     const dailyStats: { date: string; income: number; savings: number }[] = [];
     for (let i = 13; i >= 0; i--) {
       const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-      const dayTx = await db.transaction.findMany({
-        where: { createdAt: { gte: dayStart, lt: dayEnd } },
-      });
-
+      const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString();
+      const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).toISOString();
+      const dayTx = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? AND createdAt < ?").all(dayStart, dayEnd) as Record<string, unknown>[];
       dailyStats.push({
         date: day.toLocaleDateString("uz-UZ", { day: "2-digit", month: "short" }),
-        income: dayTx.reduce((s, t) => s + t.amount, 0),
-        savings: dayTx.reduce((s, t) => s + t.savingsAmount, 0),
+        income: sum(dayTx, "amount"),
+        savings: sum(dayTx, "savingsAmount"),
       });
     }
 
     // Banklar bo'yicha
-    const bankStats = monthTransactions.reduce(
-      (acc, t) => {
-        const bank = t.bankName || "Noma'lum";
-        if (!acc[bank]) acc[bank] = { count: 0, total: 0 };
-        acc[bank].count++;
-        acc[bank].total += t.amount;
-        return acc;
-      },
-      {} as Record<string, { count: number; total: number }>
-    );
+    const bankStats: Record<string, { count: number; total: number }> = {};
+    for (const t of monthTxs) {
+      const bank = String(t.bankName || "Noma'lum");
+      if (!bankStats[bank]) bankStats[bank] = { count: 0, total: 0 };
+      bankStats[bank].count++;
+      bankStats[bank].total += Number(t.amount);
+    }
 
     return NextResponse.json({
       month: {
-        totalIncome,
-        totalNeeds,
-        totalWants,
-        totalSavings,
-        transferredSavings,
-        pendingSavings: totalSavings - transferredSavings,
-        transactionCount: monthTransactions.length,
+        totalIncome: sum(monthTxs, "amount"),
+        totalNeeds: sum(monthTxs, "needsAmount"),
+        totalWants: sum(monthTxs, "wantsAmount"),
+        totalSavings: sum(monthTxs, "savingsAmount"),
+        transferredSavings: sumIf(monthTxs, "savingsAmount", "savingsTransferred"),
+        pendingSavings: sum(monthTxs, "savingsAmount") - sumIf(monthTxs, "savingsAmount", "savingsTransferred"),
+        transactionCount: monthTxs.length,
       },
       week: {
-        totalIncome: weekIncome,
-        totalNeeds: weekNeeds,
-        totalWants: weekWants,
-        totalSavings: weekSavings,
-        transactionCount: weekTransactions.length,
+        totalIncome: sum(weekTxs, "amount"),
+        totalNeeds: sum(weekTxs, "needsAmount"),
+        totalWants: sum(weekTxs, "wantsAmount"),
+        totalSavings: sum(weekTxs, "savingsAmount"),
+        transactionCount: weekTxs.length,
       },
       dailyStats,
       bankStats,

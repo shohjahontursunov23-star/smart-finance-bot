@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import db from "@/lib/db";
 
 export async function PATCH(
   request: Request,
@@ -9,17 +9,17 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const { savingsTransferred } = body;
+    const now = new Date().toISOString();
 
-    const transaction = await db.transaction.update({
-      where: { id },
-      data: {
-        ...(savingsTransferred !== undefined && {
-          savingsTransferred,
-          confirmedAt: savingsTransferred ? new Date() : null,
-        }),
-      },
-    });
+    db.prepare(`
+      UPDATE Transaction SET
+        savingsTransferred = ?,
+        confirmedAt = ?,
+        updatedAt = ?
+      WHERE id = ?
+    `).run(savingsTransferred ? 1 : 0, savingsTransferred ? now : null, now, id);
 
+    const transaction = db.prepare("SELECT * FROM Transaction WHERE id = ?").get(id);
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("PATCH transaction error:", error);
@@ -33,7 +33,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await db.transaction.delete({ where: { id } });
+    db.prepare("DELETE FROM Transaction WHERE id = ?").run(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE transaction error:", error);
