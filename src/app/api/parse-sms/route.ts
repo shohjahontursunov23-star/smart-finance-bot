@@ -11,8 +11,45 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+// HUMOcardbot Telegram message parser
+function parseHUMOBotMessage(text: string): { amount: number; bankName: string; cardLast4: string } | null {
+  const isHUMO = /HUMO Card:|💳.*HUMOCARD/i.test(text);
+  if (!isHUMO) return null;
+
+  // Try emoji format: ➖ 5.000,00 UZS or ➕ 5.000,00 UZS
+  const emojiAmountMatch = text.match(/[➖➕]\s*([\d.,]+)\s*UZS/i);
+  if (emojiAmountMatch) {
+    const amount = parseInt(emojiAmountMatch[1].replace(/\./g, "").replace(",", ""), 10);
+    if (!isNaN(amount) && amount > 0) {
+      const cardMatch = text.match(/💳\s*HUMOCARD\s*\*(\d+)/i);
+      return {
+        amount,
+        bankName: "HUMO",
+        cardLast4: cardMatch ? cardMatch[1] : "",
+      };
+    }
+  }
+
+  // Try regular SMS format from HUMO
+  const regularAmountMatch = text.match(/(\d[\d\s,.]*)\s*(?:so'm|UZS)/i);
+  if (regularAmountMatch) {
+    const amount = parseInt(regularAmountMatch[1].replace(/[\s,.]/g, ""), 10);
+    if (!isNaN(amount) && amount > 0) {
+      const cardMatch = text.match(/HUMOCARD\s*\*(\d+)/i);
+      return {
+        amount,
+        bankName: "HUMO",
+        cardLast4: cardMatch ? cardMatch[1] : "",
+      };
+    }
+  }
+
+  return null;
+}
+
 // SMS parsing patterns for Uzbekistan banks
 function detectBank(sms: string): string {
+  if (/HUMO/i.test(sms)) return "HUMO";
   const bankKeywords: { bank: string; keywords: string[] }[] = [
     { bank: "Uzum Bank", keywords: ["uzum", "uzumbank"] },
     { bank: "Kapitalbank", keywords: ["kapital"] },
@@ -41,7 +78,7 @@ function detectBank(sms: string): string {
 
 function extractAmount(sms: string): number | null {
   const patterns = [
-    /(?:kartaingizga|o'tkazildi|kredit|tushdi|postuplenie|received|hisob|karta)[^\d]*(\d[\d\s,.]*)\s*(?:so'm|UZS)/i,
+    /(?:kartaingizga|o'tkazildi|kredit|tushdi|postuplenie|received|hisob|karta|popolnenie)[^\d]*(\d[\d\s,.]*)\s*(?:so'm|UZS)/i,
     /(\d[\d\s,.]*)\s*(?:so'm|UZS|sum)/i,
   ];
   for (const pattern of patterns) {
@@ -56,7 +93,7 @@ function extractAmount(sms: string): number | null {
 }
 
 function extractCardLast4(sms: string): string {
-  const match = sms.match(/(?:karta|card)[^:]*:?\s*\*?(\d{4})/i);
+  const match = sms.match(/(?:karta|card|HUMOCARD)[^:]*:?\s*\*?(\d{4})/i);
   return match ? match[1] : "";
 }
 
@@ -77,13 +114,15 @@ export async function POST(request: Request) {
       }
     }
 
-    const amount = extractAmount(sms);
+    // Try HUMOcardbot format first, then generic SMS
+    const botResult = parseHUMOBotMessage(sms);
+    const amount = botResult?.amount ?? extractAmount(sms);
+    const bankName = botResult?.bankName ?? detectBank(sms);
+    const cardLast4 = botResult?.cardLast4 || extractCardLast4(sms);
+
     if (amount === null) {
       return NextResponse.json({ error: "SMS'dan pul miqdorini aniqlab bo'lmadi", parsed: false }, { status: 422, headers: CORS_HEADERS });
     }
-
-    const bankName = detectBank(sms);
-    const cardLast4 = extractCardLast4(sms);
 
     const needsPct = settings?.needsPercent ?? 50;
     const wantsPct = settings?.wantsPercent ?? 30;
@@ -109,17 +148,6 @@ export async function POST(request: Request) {
         smsText: sms, bankName, cardLast4, paymentLink,
       },
     });
-
-    // Notify Telegram bot mini-service if running (non-fatal)
-    try {
-      await fetch(`http://localhost:3003/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transaction, breakdown: { needs: { percent: needsPct, amount: needsAmount }, wants: { percent: wantsPct, amount: wantsAmount }, savings: { percent: savingsPct, amount: savingsAmount } } }),
-      });
-    } catch {
-      // Bot service may not be running — non-fatal
-    }
 
     return NextResponse.json({
       parsed: true,
