@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 
 export async function GET() {
   try {
-    const txs = db.prepare("SELECT * FROM Transaction ORDER BY createdAt DESC").all() as Record<string, unknown>[];
+    const txs = db.prepare("SELECT * FROM txns ORDER BY createdAt DESC").all() as Record<string, unknown>[];
     const settings = db.prepare("SELECT * FROM Settings WHERE id = 'default'").get() as Record<string, unknown> | undefined;
 
     const rows = txs.map((tx) => ({

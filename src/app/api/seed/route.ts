@@ -10,7 +10,7 @@ export async function POST() {
     const wantsPct = Number(settings?.wantsPercent ?? 30);
     const savingsPct = Number(settings?.savingsPercent ?? 20);
 
-    db.prepare("DELETE FROM Transaction").run();
+    db.prepare("DELETE FROM txns").run();
 
     const SAMPLE_SMS = [
       "Uzum Bank. Karta: 1234. Balans: 550,000 so'm. Kartaingizga 50,000 so'm o'tkazildi.",
@@ -24,7 +24,7 @@ export async function POST() {
     ];
 
     const insert = db.prepare(`
-      INSERT INTO Transaction (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, savingsTransferred, confirmedAt, createdAt, updatedAt)
+      INSERT INTO txns (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, savingsTransferred, confirmedAt, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 

@@ -10,7 +10,7 @@ export async function POST() {
     }
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const txs = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? ORDER BY createdAt DESC").all(weekAgo) as Record<string, unknown>[];
+    const txs = db.prepare("SELECT * FROM txns WHERE createdAt >= ? ORDER BY createdAt DESC").all(weekAgo) as Record<string, unknown>[];
 
     if (txs.length === 0) {
       return NextResponse.json({ success: false, error: "Bu hafta operatsiya yo'q" });
@@ -69,7 +69,7 @@ export async function GET() {
   try {
     const settings = db.prepare("SELECT * FROM Settings WHERE id = 'default'").get() as Record<string, unknown> | undefined;
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const txs = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ?").all(weekAgo) as Record<string, unknown>[];
+    const txs = db.prepare("SELECT * FROM txns WHERE createdAt >= ?").all(weekAgo) as Record<string, unknown>[];
 
     const totalSavings = txs.reduce((s, t) => s + Number(t.savingsAmount), 0);
     const transferred = txs.filter((t) => Number(t.savingsTransferred) === 1).reduce((s, t) => s + Number(t.savingsAmount), 0);

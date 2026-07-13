@@ -38,9 +38,9 @@ function getDb(): Database.Database {
     )
   `);
 
-  // Transaction jadvali
+  // Tranzaksiyalar jadvali
   _db.exec(`
-    CREATE TABLE IF NOT EXISTS Transaction (
+    CREATE TABLE IF NOT EXISTS txns (
       id                 TEXT PRIMARY KEY,
       amount             INTEGER NOT NULL,
       needsAmount        INTEGER NOT NULL,

@@ -8,10 +8,10 @@ export async function GET() {
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
     monthEnd.replace("T00", "T00"); // just ensure format
 
-    const monthTxs = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? AND createdAt < ? ORDER BY createdAt DESC").all(monthStart, new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()) as Record<string, unknown>[];
+    const monthTxs = db.prepare("SELECT * FROM txns WHERE createdAt >= ? AND createdAt < ? ORDER BY createdAt DESC").all(monthStart, new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()) as Record<string, unknown>[];
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const weekTxs = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? ORDER BY createdAt DESC").all(weekAgo) as Record<string, unknown>[];
+    const weekTxs = db.prepare("SELECT * FROM txns WHERE createdAt >= ? ORDER BY createdAt DESC").all(weekAgo) as Record<string, unknown>[];
 
     const sum = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, t) => s + Number(t[key] || 0), 0);
     const sumIf = (arr: Record<string, unknown>[], key: string, filterKey: string) => arr.filter(t => Number(t[filterKey]) === 1).reduce((s, t) => s + Number(t[key] || 0), 0);
@@ -22,7 +22,7 @@ export async function GET() {
       const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
       const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString();
       const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).toISOString();
-      const dayTx = db.prepare("SELECT * FROM Transaction WHERE createdAt >= ? AND createdAt < ?").all(dayStart, dayEnd) as Record<string, unknown>[];
+      const dayTx = db.prepare("SELECT * FROM txns WHERE createdAt >= ? AND createdAt < ?").all(dayStart, dayEnd) as Record<string, unknown>[];
       dailyStats.push({
         date: day.toLocaleDateString("uz-UZ", { day: "2-digit", month: "short" }),
         income: sum(dayTx, "amount"),

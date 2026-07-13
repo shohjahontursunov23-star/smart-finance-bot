@@ -12,14 +12,14 @@ export async function PATCH(
     const now = new Date().toISOString();
 
     db.prepare(`
-      UPDATE Transaction SET
+      UPDATE txns SET
         savingsTransferred = ?,
         confirmedAt = ?,
         updatedAt = ?
       WHERE id = ?
     `).run(savingsTransferred ? 1 : 0, savingsTransferred ? now : null, now, id);
 
-    const transaction = db.prepare("SELECT * FROM Transaction WHERE id = ?").get(id);
+    const transaction = db.prepare("SELECT * FROM txns WHERE id = ?").get(id);
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("PATCH transaction error:", error);
@@ -33,7 +33,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    db.prepare("DELETE FROM Transaction WHERE id = ?").run(id);
+    db.prepare("DELETE FROM txns WHERE id = ?").run(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE transaction error:", error);

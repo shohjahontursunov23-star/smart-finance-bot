@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO Transaction (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, createdAt, updatedAt)
+      INSERT INTO txns (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, amount, needsAmount, wantsAmount, savingsAmount, sms, bankName, cardLast4, paymentLink, now, now);
 

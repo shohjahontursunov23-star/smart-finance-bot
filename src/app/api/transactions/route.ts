@@ -3,7 +3,7 @@ import db from "@/lib/db";
 
 export async function GET() {
   try {
-    const transactions = db.prepare("SELECT * FROM Transaction ORDER BY createdAt DESC").all();
+    const transactions = db.prepare("SELECT * FROM txns ORDER BY createdAt DESC").all();
     return NextResponse.json(transactions);
   } catch (error) {
     console.error("GET transactions error:", error);
@@ -45,11 +45,11 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO Transaction (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, createdAt, updatedAt)
+      INSERT INTO txns (id, amount, needsAmount, wantsAmount, savingsAmount, smsText, bankName, cardLast4, paymentLink, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, amount, needsAmount, wantsAmount, savingsAmount, smsText || `Qo'lda kiritilgan: ${amount} so'm`, bankName || "Qo'lda", cardLast4 || "", paymentLink, now, now);
 
-    const transaction = db.prepare("SELECT * FROM Transaction WHERE id = ?").get(id);
+    const transaction = db.prepare("SELECT * FROM txns WHERE id = ?").get(id);
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {
     console.error("POST transaction error:", error);
