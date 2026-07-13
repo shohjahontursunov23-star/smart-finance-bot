@@ -10,6 +10,11 @@ RUN npm install
 COPY . .
 RUN npm run build
 
+# better-sqlite3 native modulni standalone ga nusxalash
+RUN cp -r node_modules/better-sqlite3 .next/standalone/node_modules/better-sqlite3
+RUN cp -r .next/static .next/standalone/.next/
+RUN cp -r public .next/standalone/
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
